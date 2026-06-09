@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: busride_sqlserver
+    environment:
+      SA_PASSWORD: "BusRide@2024Secure!"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - busride_net
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'BusRide@2024Secure!' -Q 'SELECT 1' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: busride_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - busride_net
+    command: redis-server --appendonly yes
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: busride_backend
+    environment:
+      NODE_ENV: development
+      DB_HOST: sqlserver
+      DB_PORT: 1433
+      DB_NAME: busride_db
+      DB_USER: sa
+      DB_PASSWORD: "BusRide@2024Secure!"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: "busride-jwt-secret-change-in-production"
+      JWT_EXPIRES_IN: "24h"
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - busride_net
+    volumes:
+      - ./backend/src:/app/src
+    command: npm run start:dev
+
+volumes:
+  sqlserver_data:
+  redis_data:
+
+networks:
+  busride_net:
+    driver: bridge
