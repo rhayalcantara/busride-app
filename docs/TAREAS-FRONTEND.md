@@ -102,6 +102,15 @@ frontend/src/app/
 
 ---
 
+> **Notas de la Ola F2 (leer antes de la F3):** cerrada 2026-06-11 con `ng build` + `ng lint` en verde.
+> - **Claves de localStorage**: `busride.accessToken` / `busride.refreshToken` (las define `TokenStorage` en core/auth; el socket de tracking lee la misma clave — ya alineado por el orquestador).
+> - **F-05 debe**: registrar `provideHttpClient(withInterceptors([authInterceptor, refreshInterceptor]))` **en ese orden**, y `cargarSesion()` (devuelve Promise) en `provideAppInitializer`. Guards: `canActivate: [authGuard, rolGuard([Rol.X])]`; `rolGuard` exporta `HOME_POR_ROL`. Los specs de F-02 usan `provideHttpClientTesting()` + `provideRouter([])`.
+> - El payload del JWT no trae nombre/apellido: tras restaurar sesión desde el token quedan `''`; rehidratar vía `GET /usuarios/me` si la UI los necesita.
+> - **core/api**: las respuestas de SPs/queries crudas llegan en **snake_case** y así están tipadas (`RutaDisponible`, `Paquete`, `Transaccion`, `LiquidacionConductor`, `ViajeFinalizado`, `PasajeroEnParada`, `ParadaConUbicacion`). Las paradas embebidas en `Ruta` NO traen lat/lng (columna geography): usar `GET /rutas/:id/paradas`. `GET /viajes/mi-activo` → `Viaje | null`. El resumen de liquidaciones llega como arreglo de 1 fila (tomar `[0]`). La compra de wallet es unión discriminada por `idempotente`.
+> - **Falta en el backend** un listado admin de liquidaciones (solo existen `/mias`, `/mias/resumen`, `:id/pagar`): F-08 no puede listar pendientes; evaluar añadir `GET /liquidaciones` (admin) en F-09.
+> - Los pipes es-DO usan `Intl` directamente (no hace falta registrar locale Angular, aunque F-05 puede hacerlo para Material).
+> - Mapa Leaflet: marcadores con `L.divIcon` (emoji por tipo); shell desacoplado de AuthService (inputs/outputs).
+
 ## OLA F3 — Integración del núcleo (1 subagente, secuencial)
 
 ### F-05 · Wiring, login/registro y shells por rol
@@ -182,9 +191,9 @@ frontend/src/app/
 | Tarea | Ola | Estado |
 |---|---|---|
 | F-01 Scaffold + tooling | F1 | ✅ Completada (2026-06-10) |
-| F-02 Core auth + interceptores + guards | F2 | ⬜ Pendiente |
-| F-03 Servicios API tipados | F2 | ⬜ Pendiente |
-| F-04 Shared UI + socket tracking | F2 | ⬜ Pendiente |
+| F-02 Core auth + interceptores + guards | F2 | ✅ Completada (2026-06-11) |
+| F-03 Servicios API tipados | F2 | ✅ Completada (2026-06-11) |
+| F-04 Shared UI + socket tracking | F2 | ✅ Completada (2026-06-11) |
 | F-05 Wiring + login/registro + shells | F3 | ⬜ Pendiente |
 | F-06 Área Pasajero | F4 | ⬜ Pendiente |
 | F-07 Área Conductor | F4 | ⬜ Pendiente |
