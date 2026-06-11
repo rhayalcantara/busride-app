@@ -128,6 +128,13 @@ frontend/src/app/
 
 ## OLA F4 — Features por rol (3 subagentes en paralelo)
 
+> **Notas de la Ola F3 (leer antes de la F4):** cerrada 2026-06-11 con build + lint + 22/22 unit tests y flujo HTTP completo (login admin, registro pasajero, refresh con rotación verificada, logout) contra el backend real — evidencia en `docs/VERIFICACION-FRONTEND.md`.
+> - Cada tarea F4 reemplaza ÍNTEGRO su `features/<area>/<area>.routes.ts` manteniendo el nombre del export (`PASAJERO_ROUTES` / `CONDUCTOR_ROUTES` / `PANEL_ROUTES`); `app.routes.ts` ya aplica `authGuard` + `rolGuard` por área — NO añadir guards dentro del área.
+> - Patrón de página (ver placeholders): standalone con `<app-shell titulo [itemsMenu] [nombreUsuario] (cerrarSesion)>`; `salir()` = `auth.logout()` + navigate a `/login`. En `/panel`, filtrar `itemsMenu` según `auth.rol()` (admin vs asociacion).
+> - Nombre/apellido quedan `''` al restaurar sesión desde el JWT: rehidratar con `GET /usuarios/me` si la UI los muestra (el endpoint es `/usuarios/me`, no `/usuarios/perfil`).
+> - Errores: 403 y 5xx/0 ya muestran snackbar global (`core/interceptors/errores.interceptor.ts`); cada feature maneja solo sus 400/404/409 (referencia: `extraerMensajeError` en `features/auth/mensaje-error.util.ts`).
+> - `@angular/animations` NO está instalado (Material 20 no lo requiere; build/tests OK). Si alguna feature lo necesita de verdad: reportarlo, se instala en F-09. Locale Angular es-DO sin registrar (los pipes usan Intl).
+
 > Dependen de F-05. Cada tarea posee EXCLUSIVAMENTE `src/app/features/<su-area>/**` (incluido su `<area>.routes.ts`). PROHIBIDO tocar app.config/app.routes/package.json/core/shared y áreas ajenas. Si un servicio de `core/api` tiene un bug/falta un método: repórtalo, no lo edites (lo consolida F-09). Type-check con `npx tsc --noEmit -p tsconfig.app.json`; el build real al cierre de ola. Todas las páginas: Material + responsive móvil primero (pasajero/conductor se usan en el teléfono).
 
 ### F-06 · Área Pasajero (`features/pasajero/`)
@@ -194,7 +201,7 @@ frontend/src/app/
 | F-02 Core auth + interceptores + guards | F2 | ✅ Completada (2026-06-11) |
 | F-03 Servicios API tipados | F2 | ✅ Completada (2026-06-11) |
 | F-04 Shared UI + socket tracking | F2 | ✅ Completada (2026-06-11) |
-| F-05 Wiring + login/registro + shells | F3 | ⬜ Pendiente |
+| F-05 Wiring + login/registro + shells | F3 | ✅ Completada (2026-06-11) |
 | F-06 Área Pasajero | F4 | ⬜ Pendiente |
 | F-07 Área Conductor | F4 | ⬜ Pendiente |
 | F-08 Área Panel admin/asociación | F4 | ⬜ Pendiente |
