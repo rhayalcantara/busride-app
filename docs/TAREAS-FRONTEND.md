@@ -168,6 +168,17 @@ frontend/src/app/
 
 ---
 
+> **Notas de la Ola F4 (leer antes de la F5):** cerrada 2026-06-11 con build + lint + 22/22 unit tests. Las 3 áreas verificadas contra el backend real a nivel API (demos curl completas: pasajero buscó/reservó con QR; conductor inició viaje→abordó con token→finalizó→vio liquidación; panel creó asociación→conductor→bus→ruta→horario→asignación y verificó el 409). El orquestador corrigió 2 warnings de template al cierre (`?? 0` innecesario y proyección de contenido en un `@else`).
+> **Fricciones consolidadas que F-09 debe resolver (o documentar como deuda):**
+> - **Backend — `emitirDisponibilidadActualizada` no tiene llamadores** (`tracking.gateway.ts`): los "asientos en vivo" del conductor/pasajero nunca reciben eventos. Invocarlo desde `ReservasService.confirmarAbordaje` (y crear reserva/expirar si aplica).
+> - **Backend — falta `GET /liquidaciones` (admin)**: el panel solo puede "marcar pagada por ID" a ciegas.
+> - **Backend — `GET /asociaciones` solo devuelve ACTIVAS** (las PENDIENTES no se pueden listar tras un reload; añadir `?estado=`), no existe `GET /asociaciones/mia` (el rol asociacion se resuelve filtrando activas por `usuarioId`), y `GET /usuarios` no filtra por rol (selectores cargan `limite=100` y filtran en cliente).
+> - **Backend — falta `GET /viajes/:id`** accesible al pasajero: viaje-en-vivo no puede pintar estado/última posición antes del primer evento de socket (depende de query params).
+> - **Backend — `Reserva` no expone flag `calificada`**: el botón calificar solo se oculta en sesión; recalificar → 409 (manejado).
+> - `extraerMensajeError` vive en `features/auth/mensaje-error.util.ts` y lo importan conductor (cross-feature) y panel (copia local): moverlo a `shared/utils` y unificar.
+> - Comentario desactualizado en `auth.service.ts` (menciona `/usuarios/perfil`; el endpoint es `/usuarios/me`).
+> - Pendientes de navegador real (Playwright): render de mapa/QR, geolocation, cámara del escáner, tracking socket end-to-end, calificación tras abordaje.
+
 ## OLA F5 — Integración final + E2E (1 subagente, secuencial)
 
 ### F-09 · Integración, Playwright y build de producción
@@ -202,8 +213,8 @@ frontend/src/app/
 | F-03 Servicios API tipados | F2 | ✅ Completada (2026-06-11) |
 | F-04 Shared UI + socket tracking | F2 | ✅ Completada (2026-06-11) |
 | F-05 Wiring + login/registro + shells | F3 | ✅ Completada (2026-06-11) |
-| F-06 Área Pasajero | F4 | ⬜ Pendiente |
-| F-07 Área Conductor | F4 | ⬜ Pendiente |
-| F-08 Área Panel admin/asociación | F4 | ⬜ Pendiente |
+| F-06 Área Pasajero | F4 | ✅ Completada (2026-06-11) |
+| F-07 Área Conductor | F4 | ✅ Completada (2026-06-11) |
+| F-08 Área Panel admin/asociación | F4 | ✅ Completada (2026-06-11) |
 | F-09 Integración + Playwright + build prod | F5 | ⬜ Pendiente |
 | F-10 Docs y cierre | F6 | ⬜ Pendiente |

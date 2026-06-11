@@ -1,54 +1,79 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { Router, Routes } from '@angular/router';
-import { AuthService } from '../../core/auth';
-import { ItemMenuShell, ShellComponent } from '../../shared';
+import { inject } from '@angular/core';
+import { Routes } from '@angular/router';
+import { AuthService, Rol } from '../../core/auth';
+import { AsociacionContextoService } from './asociacion-contexto.service';
+import { PanelShellComponent } from './panel-shell.component';
 
 /**
- * Placeholder de la Ola F3. F-08 (Ola F4) reemplaza ESTE archivo completo con
- * las páginas reales del panel admin/asociación (usuarios, asociaciones,
- * conductores, flota, rutas, liquidaciones). Patrón a seguir: páginas
- * standalone envueltas en <app-shell>; la visibilidad de items del menú según
- * el rol se decide leyendo AuthService.rol().
+ * Rutas del área /panel (tarea F-08).
+ *
+ * El acceso al área ya está protegido en app.routes.ts con
+ * `authGuard + rolGuard([admin, asociacion])`; aquí NO se añaden guards.
+ * Dentro, la visibilidad se condiciona por rol:
+ * - admin: usuarios, asociaciones, conductores, flota, rutas, liquidaciones.
+ * - asociacion: conductores, flota, rutas (el menú del shell filtra el resto;
+ *   si navega a mano a una página admin, el backend responde 403 y el
+ *   interceptor global lo notifica).
+ *
+ * El AsociacionContextoService (asociación de trabajo seleccionada) se provee
+ * en la ruta raíz para compartirlo entre las páginas del área.
  */
-@Component({
-  selector: 'app-panel-en-construccion',
-  imports: [ShellComponent],
-  template: `
-    <app-shell
-      titulo="BusRide — Panel"
-      [itemsMenu]="itemsMenu"
-      [nombreUsuario]="nombreUsuario()"
-      (cerrarSesion)="salir()"
-    >
-      <h2>Área en construcción</h2>
-      <p>Las páginas del panel admin/asociación llegan en la Ola F4 (tarea F-08).</p>
-      <p>Rol actual: {{ rol() }}</p>
-    </app-shell>
-  `,
-  changeDetection: ChangeDetectionStrategy.OnPush,
-})
-export class PanelEnConstruccionComponent {
-  private readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
-
-  protected readonly itemsMenu: ItemMenuShell[] = [
-    { label: 'Inicio', icono: 'home', ruta: '/panel' },
-  ];
-
-  protected readonly rol = this.auth.rol;
-
-  protected readonly nombreUsuario = computed(() => {
-    const usuario = this.auth.usuario();
-    if (!usuario) return '';
-    return `${usuario.nombre} ${usuario.apellido}`.trim() || usuario.email;
-  });
-
-  salir(): void {
-    this.auth.logout();
-    void this.router.navigateByUrl('/login');
-  }
-}
-
 export const PANEL_ROUTES: Routes = [
-  { path: '', component: PanelEnConstruccionComponent },
+  {
+    path: '',
+    component: PanelShellComponent,
+    providers: [AsociacionContextoService],
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        // Home por rol: admin aterriza en usuarios; asociación, en conductores
+        redirectTo: () => (inject(AuthService).rol() === Rol.ADMIN ? 'usuarios' : 'conductores'),
+      },
+      {
+        path: 'usuarios',
+        loadComponent: () =>
+          import('./paginas/usuarios/usuarios.page').then((m) => m.UsuariosPageComponent),
+        title: 'BusRide — Usuarios',
+      },
+      {
+        path: 'asociaciones',
+        loadComponent: () =>
+          import('./paginas/asociaciones/asociaciones.page').then(
+            (m) => m.AsociacionesPageComponent,
+          ),
+        title: 'BusRide — Asociaciones',
+      },
+      {
+        path: 'conductores',
+        loadComponent: () =>
+          import('./paginas/conductores/conductores.page').then((m) => m.ConductoresPageComponent),
+        title: 'BusRide — Conductores',
+      },
+      {
+        path: 'flota',
+        loadComponent: () => import('./paginas/flota/flota.page').then((m) => m.FlotaPageComponent),
+        title: 'BusRide — Flota',
+      },
+      {
+        path: 'rutas',
+        loadComponent: () => import('./paginas/rutas/rutas.page').then((m) => m.RutasPageComponent),
+        title: 'BusRide — Rutas',
+      },
+      {
+        path: 'rutas/crear',
+        loadComponent: () =>
+          import('./paginas/rutas/crear-ruta.page').then((m) => m.CrearRutaPageComponent),
+        title: 'BusRide — Nueva ruta',
+      },
+      {
+        path: 'liquidaciones',
+        loadComponent: () =>
+          import('./paginas/liquidaciones/liquidaciones.page').then(
+            (m) => m.LiquidacionesPageComponent,
+          ),
+        title: 'BusRide — Liquidaciones',
+      },
+    ],
+  },
 ];
