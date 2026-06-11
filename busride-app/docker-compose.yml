@@ -16,11 +16,33 @@ services:
     networks:
       - busride_net
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'BusRide@2024Secure!' -Q 'SELECT 1' || exit 1"]
+      # La imagen 2022-latest trae mssql-tools18 (no mssql-tools); -C confía en el certificado autofirmado
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'BusRide@2024Secure!' -Q 'SELECT 1' || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 10
       start_period: 30s
+
+  # One-shot (resuelve INF-1): la imagen mssql NO ejecuta /docker-entrypoint-initdb.d,
+  # así que este servicio corre database/init.sh (01→02→03, idempotente) cuando
+  # sqlserver está healthy y termina. El backend espera a que complete con éxito.
+  # Uso manual: docker compose up sqlserver-init  (o run --rm sqlserver-init)
+  sqlserver-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: busride_sqlserver_init
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      DB_HOST: sqlserver
+      SA_PASSWORD: "BusRide@2024Secure!"
+    volumes:
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+      - ./database/init.sh:/usr/local/bin/busride-init.sh:ro
+    entrypoint: ["/bin/bash", "/usr/local/bin/busride-init.sh"]
+    restart: "no"
+    networks:
+      - busride_net
 
   redis:
     image: redis:7-alpine
@@ -55,6 +77,8 @@ services:
     depends_on:
       sqlserver:
         condition: service_healthy
+      sqlserver-init:
+        condition: service_completed_successfully
       redis:
         condition: service_started
     networks:

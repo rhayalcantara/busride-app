@@ -1,0 +1,14 @@
+# Dependencias
+node_modules/
+
+# Compilados
+dist/
+
+# Variables de entorno
+.env
+
+# Cobertura de tests
+coverage/
+
+# Logs
+*.log

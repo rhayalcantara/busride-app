@@ -121,6 +121,23 @@ CREATE TABLE transacciones (
     fecha_creacion  DATETIME2 DEFAULT GETDATE()
 );
 
+-- CHECK constraints (T-16): valores reales usados por el código y los SPs —
+-- tipo: enum TipoTransaccion (RECARGA en wallet.service, ABORDAJE en
+-- sp_confirmar_abordaje, DEVOLUCION reservado para reembolsos);
+-- estado: enum EstadoTransaccion (PENDIENTE | COMPLETADA).
+ALTER TABLE transacciones ADD CONSTRAINT CK_transacciones_tipo
+    CHECK (tipo IN ('RECARGA', 'ABORDAJE', 'DEVOLUCION'));
+ALTER TABLE transacciones ADD CONSTRAINT CK_transacciones_estado
+    CHECK (estado IN ('PENDIENTE', 'COMPLETADA'));
+
+-- Idempotencia de compras wallet (T-10/T-12): una misma referencia de pasarela
+-- no puede acreditarse dos veces al mismo pasajero. Índice único FILTRADO:
+-- solo aplica a transacciones COMPLETADAS con referencia externa.
+CREATE UNIQUE INDEX UQ_transacciones_ref_externa
+    ON transacciones(pasajero_id, referencia_externa)
+    WHERE referencia_externa IS NOT NULL AND estado = 'COMPLETADA';
+CREATE INDEX IX_transacciones_pasajero ON transacciones(pasajero_id);
+
 -- ============================================================
 -- MÓDULO 4: Buses y Flota
 -- ============================================================
@@ -168,8 +185,8 @@ CREATE TABLE paradas (
     es_terminal     BIT DEFAULT 0
 );
 -- Índice espacial sobre las paradas para búsqueda por proximidad
-CREATE SPATIAL INDEX IX_paradas_ubicacion ON paradas(ubicacion) USING GEOGRAPHY_GRID
-    WITH (BOUNDING_BOX = (XMIN = -180, YMIN = -90, XMAX = 180, YMAX = 90));
+-- Nota: BOUNDING_BOX solo aplica a GEOMETRY_GRID; en GEOGRAPHY_GRID es inválido (Msg 12005)
+CREATE SPATIAL INDEX IX_paradas_ubicacion ON paradas(ubicacion) USING GEOGRAPHY_GRID;
 CREATE INDEX IX_paradas_ruta ON paradas(ruta_id);
 
 CREATE TABLE horarios (
@@ -207,6 +224,10 @@ CREATE TABLE viajes (
     fecha_fin       DATETIME2,
     -- Posición actual del bus (actualizada cada 5 seg via WebSocket)
     posicion_actual geography,
+    -- T-12: réplica plana de la posición (la entidad TypeORM no mapea geography;
+    -- ViajesService.actualizarPosicion escribe ambas representaciones)
+    pos_lat         FLOAT,
+    pos_lng         FLOAT,
     fecha_posicion  DATETIME2,
     ingreso_total   DECIMAL(10,2) DEFAULT 0.00,
     fecha_creacion  DATETIME2 DEFAULT GETDATE()

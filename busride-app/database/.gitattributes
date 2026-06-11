@@ -1,0 +1,3 @@
+# init.sh se monta dentro del contenedor Linux: debe mantener LF
+# aunque core.autocrlf=true en Windows.
+init.sh text eol=lf
