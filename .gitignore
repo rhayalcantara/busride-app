@@ -10,5 +10,10 @@ dist/
 # Cobertura de tests
 coverage/
 
+# Frontend (Angular)
+.angular/
+playwright-report/
+test-results/
+
 # Logs
 *.log

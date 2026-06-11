@@ -57,6 +57,15 @@ frontend/src/app/
 
 ---
 
+> **Notas de la Ola F1 (leer antes de la F2):**
+> - **Angular 20.3** (no 21: el CLI 21 exige Node ≥24.15.0 y la máquina tiene 24.14.0). Estilo de nombres de Angular 20: `app.ts`/`app.html` (clase `App`), componentes standalone, signals, control flow `@if`/`@for`.
+> - Runner de tests: **Karma + ChromeHeadless** (`ng test --watch=false --browsers=ChromeHeadless`) — funciona en esta máquina (verificado 1/1).
+> - Deps instaladas: @angular/material 20 (tema azure/blue en `styles.scss` vía `mat.theme`), leaflet (+types, CSS ya importado en styles.scss), socket.io-client, @zxing/browser, @playwright/test, prettier, angular-eslint (`ng lint` operativo).
+> - Proxy: `proxy.conf.json` (`/api` y `/socket.io` → localhost:3002, ws true) cableado en `angular.json` serve. Verificado real: login del seed admin vía `http://localhost:4200/api/v1/auth/login` → 200 con tokens.
+> - `environment.development.ts` / `environment.ts`: `{ production, apiUrl: '/api/v1', wsUrl: '' }`.
+> - Estructura de carpetas creada con `.gitkeep`; rutas mínimas con `LoginPlaceholderComponent` en `features/auth/` (F-05 lo reemplaza).
+> - El subagente F-01 falló por el patrón "background + fin de turno" (dos veces); el orquestador completó la tarea. Para olas futuras: NO lanzar procesos largos en background dentro de subagentes — ejecutarlos en foreground con timeout.
+
 ## OLA F2 — Núcleo (3 subagentes en paralelo)
 
 > Todas dependen de F-01. PROHIBIDO tocar `package.json`, `app.config.ts`, `app.routes.ts`, `styles.scss` y carpetas ajenas. PROHIBIDO `npm install`. Verificación individual SOLO con `npx ng build 2>&1` (no toca estado compartido) o `npx tsc --noEmit` si el build colisiona — coordinado: F-02/F-03/F-04 PUEDEN ejecutar build porque Angular compila a memoria en `ng build` con outputs separados… **regla práctica: solo `npx tsc --noEmit -p tsconfig.app.json`**; el `ng build` real lo hace el orquestador al cerrar la ola.
@@ -172,7 +181,7 @@ frontend/src/app/
 
 | Tarea | Ola | Estado |
 |---|---|---|
-| F-01 Scaffold + tooling | F1 | ⬜ Pendiente |
+| F-01 Scaffold + tooling | F1 | ✅ Completada (2026-06-10) |
 | F-02 Core auth + interceptores + guards | F2 | ⬜ Pendiente |
 | F-03 Servicios API tipados | F2 | ⬜ Pendiente |
 | F-04 Shared UI + socket tracking | F2 | ⬜ Pendiente |
