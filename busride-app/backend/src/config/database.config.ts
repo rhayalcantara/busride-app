@@ -4,7 +4,8 @@ import { ConfigService } from '@nestjs/config';
 export const getDatabaseConfig = (configService: ConfigService): TypeOrmModuleOptions => ({
   type: 'mssql',
   host: configService.get<string>('DB_HOST', 'localhost'),
-  port: configService.get<number>('DB_PORT', 1433),
+  // tedious exige number; ConfigService devuelve string desde .env
+  port: parseInt(configService.get<string>('DB_PORT', '1433'), 10),
   database: configService.get<string>('DB_NAME', 'busride_db'),
   username: configService.get<string>('DB_USER', 'sa'),
   password: configService.get<string>('DB_PASSWORD'),

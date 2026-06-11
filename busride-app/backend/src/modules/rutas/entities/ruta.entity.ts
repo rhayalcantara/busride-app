@@ -29,9 +29,10 @@ export class Ruta {
   @Column({ default: true })
   activa: boolean;
 
-  // polyline almacenada como WKT, convertida a geography en SQL Server
-  @Column({ type: 'nvarchar', length: 'max', nullable: true })
-  polylineWkt: string;
+  // Bug de integración corregido en T-12: la tabla rutas NO tiene columna
+  // polylineWkt (solo `polyline geography`, que se escribe con SQL crudo en
+  // RutasService.crearRuta). Propiedad de transporte, NO persistida.
+  polylineWkt?: string;
 
   @OneToMany(() => Parada, parada => parada.ruta, { cascade: true })
   paradas: Parada[];

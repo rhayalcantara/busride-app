@@ -1,16 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Ruta } from './entities/ruta.entity';
 import { Parada } from './entities/parada.entity';
-
-export interface BuscarRutasDto {
-  latOrigen: number;
-  lngOrigen: number;
-  latDestino: number;
-  lngDestino: number;
-  radioMetros?: number;
-}
+import { RolNombre, UsuarioAutenticado } from '../../common';
+import { BuscarRutasDto } from './dto/buscar-rutas.dto';
+import { CrearRutaDto } from './dto/crear-ruta.dto';
 
 @Injectable()
 export class RutasService {
@@ -19,6 +14,37 @@ export class RutasService {
     @InjectRepository(Parada) private paradaRepo: Repository<Parada>,
     private dataSource: DataSource,
   ) {}
+
+  // Resuelve la asociación dueña de la ruta (F4): para rol asociacion se deriva
+  // del JWT (usuario administrador de la asociación); el admin debe indicarla.
+  private async resolverAsociacionId(user: UsuarioAutenticado, dto: CrearRutaDto): Promise<string> {
+    if (user.rol === RolNombre.ASOCIACION) {
+      const [asociacion] = await this.dataSource.query(
+        `SELECT id FROM asociaciones WHERE usuario_id = @0`,
+        [user.userId],
+      );
+      if (!asociacion) {
+        throw new NotFoundException('Tu usuario no administra ninguna asociación');
+      }
+      return asociacion.id;
+    }
+
+    // Rol admin: la asociación viene en el DTO y debe existir
+    if (!dto.asociacionId) {
+      throw new BadRequestException('asociacionId es obligatorio para rol admin');
+    }
+    const [existe] = await this.dataSource.query(
+      `SELECT id FROM asociaciones WHERE id = @0`,
+      [dto.asociacionId],
+    );
+    if (!existe) throw new NotFoundException('Asociación no encontrada');
+    return dto.asociacionId;
+  }
+
+  async crearRutaComoUsuario(user: UsuarioAutenticado, dto: CrearRutaDto) {
+    const asociacionId = await this.resolverAsociacionId(user, dto);
+    return this.crearRuta(asociacionId, dto);
+  }
 
   async buscarRutasDisponibles(dto: BuscarRutasDto) {
     const radio = dto.radioMetros || 500;
@@ -37,13 +63,17 @@ export class RutasService {
     return resultado;
   }
 
-  async crearRuta(asociacionId: string, data: Partial<Ruta> & { paradas: Partial<Parada>[] }) {
+  async crearRuta(asociacionId: string, data: CrearRutaDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      const ruta = this.rutaRepo.create({ ...data, asociacionId });
+      // T-12: paradas y polylineWkt NO se persisten vía entidad (las paradas se
+      // insertan abajo con SQL crudo por la columna geography; el cascade del
+      // relation fallaría porque `ubicacion` es NOT NULL).
+      const { paradas: _paradas, polylineWkt: _wkt, ...datosRuta } = data;
+      const ruta = this.rutaRepo.create({ ...datosRuta, asociacionId });
       const rutaGuardada = await queryRunner.manager.save(Ruta, ruta);
 
       // Insertar paradas con columna geography via raw SQL

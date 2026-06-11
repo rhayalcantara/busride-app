@@ -1,3 +1,4 @@
+import { Logger, UseGuards } from '@nestjs/common';
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -7,9 +8,11 @@ import {
   OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { ViajesService } from './viajes.service';
+import { WsJwtGuard } from '../../common';
 
 interface PosicionPayload {
   viajeId: string;
@@ -21,6 +24,10 @@ interface SuscribirPayload {
   viajeId: string;
 }
 
+// Todos los mensajes requieren JWT válido (F9): WsJwtGuard valida el token
+// del handshake (auth.token o header Authorization) y adjunta el payload
+// verificado en client.data.user.
+@UseGuards(WsJwtGuard)
 @WebSocketGateway({
   cors: { origin: '*' },
   namespace: '/tracking',
@@ -29,26 +36,39 @@ export class TrackingGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   @WebSocketServer()
   server: Server;
 
+  private readonly logger = new Logger(TrackingGateway.name);
+
   constructor(private viajesService: ViajesService) {}
 
   afterInit() {
-    console.log('TrackingGateway iniciado');
+    this.logger.log('TrackingGateway iniciado');
   }
 
   handleConnection(client: Socket) {
-    console.log(`Cliente conectado: ${client.id}`);
+    this.logger.log(`Cliente conectado: ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`Cliente desconectado: ${client.id}`);
+    this.logger.log(`Cliente desconectado: ${client.id}`);
   }
 
-  // Conductor envía su posición GPS cada 5 segundos
+  // Conductor envía su posición GPS cada 5 segundos.
+  // Además del JWT, solo el conductor dueño del viaje puede emitir (F4/F9).
   @SubscribeMessage('actualizar_posicion')
   async handleActualizarPosicion(
     @MessageBody() payload: PosicionPayload,
     @ConnectedSocket() client: Socket,
   ) {
+    const usuarioId: string | undefined = client.data.user?.sub;
+    if (!usuarioId) {
+      throw new WsException('Usuario no autenticado');
+    }
+
+    const esConductor = await this.viajesService.esConductorDelViaje(payload.viajeId, usuarioId);
+    if (!esConductor) {
+      throw new WsException('Solo el conductor del viaje puede actualizar su posición');
+    }
+
     const resultado = await this.viajesService.actualizarPosicion(
       payload.viajeId, payload.lat, payload.lng,
     );

@@ -1,8 +1,12 @@
-import { Controller, Get, Patch, Param, Query, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Controller, Get, Patch, Param, ParseUUIDPipe, Query, Body, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { LiquidacionService } from './liquidacion.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles, RolNombre, CurrentUser } from '../../common';
+import { PagarLiquidacionDto } from './dto/pagar-liquidacion.dto';
 
+// El conductor solo consulta SUS liquidaciones (identidad desde el JWT, F4).
+// RolesGuard ya es global (APP_GUARD).
 @ApiTags('Liquidaciones')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
@@ -10,25 +14,30 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 export class LiquidacionController {
   constructor(private readonly liquidacionService: LiquidacionService) {}
 
-  @Get('conductor/:conductorId')
-  @ApiOperation({ summary: 'Historial de liquidaciones del conductor' })
-  listarLiquidaciones(@Param('conductorId') id: string) {
-    return this.liquidacionService.obtenerLiquidacionesConductor(id);
+  @Get('mias')
+  @Roles(RolNombre.CONDUCTOR)
+  @ApiOperation({ summary: 'Historial de liquidaciones del conductor autenticado' })
+  misLiquidaciones(@CurrentUser('userId') usuarioId: string) {
+    return this.liquidacionService.obtenerMisLiquidaciones(usuarioId);
   }
 
-  @Get('conductor/:conductorId/resumen')
-  @ApiOperation({ summary: 'Resumen de liquidaciones por período' })
-  resumen(
-    @Param('conductorId') id: string,
-    @Query('inicio') inicio: string,
-    @Query('fin') fin: string,
+  @Get('mias/resumen')
+  @Roles(RolNombre.CONDUCTOR)
+  @ApiOperation({ summary: 'Resumen de liquidaciones del conductor autenticado por período' })
+  @ApiQuery({ name: 'inicio', required: false, description: 'Fecha inicio del período (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fin', required: false, description: 'Fecha fin del período (YYYY-MM-DD)' })
+  miResumen(
+    @CurrentUser('userId') usuarioId: string,
+    @Query('inicio') inicio?: string,
+    @Query('fin') fin?: string,
   ) {
-    return this.liquidacionService.resumenLiquidacionPeriodo(id, inicio, fin);
+    return this.liquidacionService.resumenMisLiquidaciones(usuarioId, inicio, fin);
   }
 
   @Patch(':id/pagar')
-  @ApiOperation({ summary: 'Marcar liquidación como pagada (admin)' })
-  marcarPagada(@Param('id') id: string, @Body() body: { referenciaPago: string }) {
-    return this.liquidacionService.marcarPagada(id, body.referenciaPago);
+  @Roles(RolNombre.ADMIN)
+  @ApiOperation({ summary: 'Marcar liquidación como pagada (solo admin)' })
+  marcarPagada(@Param('id', ParseUUIDPipe) id: string, @Body() dto: PagarLiquidacionDto) {
+    return this.liquidacionService.marcarPagada(id, dto.referenciaPago);
   }
 }

@@ -1,24 +1,11 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { Reserva } from './entities/reserva.entity';
+import { CrearReservaDto } from './dto/crear-reserva.dto';
+import { ConfirmarAbordajeDto } from './dto/confirmar-abordaje.dto';
 import * as QRCode from 'qrcode';
-
-export interface CrearReservaDto {
-  pasajeroId: string;
-  viajeId: string;
-  paradaOrigenId: number;
-  paradaDestinoId: number;
-  latPasajero: number;
-  lngPasajero: number;
-}
-
-export interface ConfirmarAbordajeDto {
-  qrToken: string;
-  conductorId: string;
-  numeroAsiento: number;
-}
 
 @Injectable()
 export class ReservasService {
@@ -28,10 +15,40 @@ export class ReservasService {
     private jwtService: JwtService,
   ) {}
 
-  async crearReserva(dto: CrearReservaDto) {
+  // Mapea el userId del JWT al perfil de pasajero (F4: la identidad nunca viene del body)
+  private async resolverPasajeroId(userId: string): Promise<string> {
+    const filas = await this.dataSource.query(
+      `SELECT id FROM pasajeros WHERE usuario_id = @0`,
+      [userId],
+    );
+    if (!filas?.length) {
+      throw new NotFoundException(
+        'Tu usuario no tiene un perfil de pasajero asociado. Contacta a soporte.',
+      );
+    }
+    return filas[0].id;
+  }
+
+  // Mapea el userId del JWT al perfil de conductor (F4)
+  private async resolverConductorId(userId: string): Promise<string> {
+    const filas = await this.dataSource.query(
+      `SELECT id FROM conductores WHERE usuario_id = @0`,
+      [userId],
+    );
+    if (!filas?.length) {
+      throw new NotFoundException(
+        'Tu usuario no tiene un perfil de conductor asociado. Contacta a soporte.',
+      );
+    }
+    return filas[0].id;
+  }
+
+  async crearReserva(userId: string, dto: CrearReservaDto) {
+    const pasajeroId = await this.resolverPasajeroId(userId);
+
     // Generar token JWT firmado como QR (TTL 5 minutos)
     const qrPayload = {
-      pasajeroId: dto.pasajeroId,
+      pasajeroId,
       viajeId: dto.viajeId,
       paradaOrigenId: dto.paradaOrigenId,
       tipo: 'ABORDAJE',
@@ -48,11 +65,15 @@ export class ReservasService {
         @lng_pasajero      = @5,
         @qr_token          = @6`,
       [
-        dto.pasajeroId, dto.viajeId, dto.paradaOrigenId,
+        pasajeroId, dto.viajeId, dto.paradaOrigenId,
         dto.paradaDestinoId, dto.latPasajero, dto.lngPasajero, qrToken,
       ],
     );
 
+    // B5 (Ola 6): si el SP no devuelve filas, error controlado en vez de TypeError/500
+    if (!resultado?.length) {
+      throw new BadRequestException('El procedimiento de reserva no devolvió resultado');
+    }
     const res = resultado[0];
     if (!res.exito) throw new BadRequestException(res.mensaje);
 
@@ -72,7 +93,9 @@ export class ReservasService {
     };
   }
 
-  async confirmarAbordaje(dto: ConfirmarAbordajeDto) {
+  async confirmarAbordaje(userId: string, dto: ConfirmarAbordajeDto) {
+    const conductorId = await this.resolverConductorId(userId);
+
     // Verificar JWT del QR antes de llamar al SP
     try {
       this.jwtService.verify(dto.qrToken);
@@ -85,9 +108,13 @@ export class ReservasService {
         @qr_token       = @0,
         @conductor_id   = @1,
         @numero_asiento = @2`,
-      [dto.qrToken, dto.conductorId, dto.numeroAsiento],
+      [dto.qrToken, conductorId, dto.numeroAsiento],
     );
 
+    // B5 (Ola 6): si el SP no devuelve filas, error controlado en vez de TypeError/500
+    if (!resultado?.length) {
+      throw new BadRequestException('El procedimiento de abordaje no devolvió resultado');
+    }
     const res = resultado[0];
     if (!res.exito) throw new BadRequestException(res.mensaje);
 
@@ -107,7 +134,10 @@ export class ReservasService {
     );
   }
 
-  async listarReservasPasajero(pasajeroId: string) {
+  // Historial de reservas del pasajero autenticado (reemplaza al listado por :pasajeroId)
+  async listarMisReservas(userId: string) {
+    const pasajeroId = await this.resolverPasajeroId(userId);
+
     return this.reservaRepo.find({
       where: { pasajeroId },
       relations: ['viaje', 'viaje.ruta', 'paradaOrigen', 'paradaDestino'],

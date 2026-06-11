@@ -56,12 +56,12 @@ export class Reserva {
   @Column({ name: 'numero_asiento', nullable: true })
   numeroAsiento: number;
 
-  // lat/lng del pasajero al reservar (la columna geography se actualiza via raw SQL)
-  @Column({ name: 'lat_pasajero', type: 'float', nullable: true })
-  latPasajero: number;
+  // Bug de integración corregido en T-12: la tabla reservas NO tiene columnas
+  // lat_pasajero/lng_pasajero — solo `ubicacion_pasajero geography`, que escribe
+  // sp_crear_reserva. Propiedades de transporte, NO persistidas.
+  latPasajero?: number;
 
-  @Column({ name: 'lng_pasajero', type: 'float', nullable: true })
-  lngPasajero: number;
+  lngPasajero?: number;
 
   @CreateDateColumn({ name: 'fecha_creacion' })
   fechaCreacion: Date;

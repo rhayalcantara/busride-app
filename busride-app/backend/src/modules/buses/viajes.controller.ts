@@ -1,8 +1,23 @@
-import { Controller, Post, Patch, Get, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Patch,
+  Get,
+  Body,
+  Param,
+  ParseIntPipe,
+  ParseUUIDPipe,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ViajesService } from './viajes.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles, RolNombre, CurrentUser } from '../../common';
+import { IniciarViajeDto } from './dto/iniciar-viaje.dto';
+import { ActualizarPosicionDto } from './dto/actualizar-posicion.dto';
 
+// La identidad del conductor se deriva SIEMPRE del JWT (F4):
+// el service resuelve usuario_id → conductores. RolesGuard ya es global (APP_GUARD).
 @ApiTags('Viajes')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
@@ -11,35 +26,44 @@ export class ViajesController {
   constructor(private readonly viajesService: ViajesService) {}
 
   @Post('iniciar')
-  @ApiOperation({ summary: 'Conductor inicia ruta' })
-  iniciar(@Body() body: { conductorId: string; asignacionId: string }) {
-    return this.viajesService.iniciarViaje(body.conductorId, body.asignacionId);
+  @Roles(RolNombre.CONDUCTOR)
+  @ApiOperation({ summary: 'Conductor autenticado inicia ruta' })
+  iniciar(@CurrentUser('userId') usuarioId: string, @Body() dto: IniciarViajeDto) {
+    return this.viajesService.iniciarViaje(usuarioId, dto.asignacionId);
   }
 
   @Patch(':id/posicion')
-  @ApiOperation({ summary: 'Actualizar posición GPS del bus' })
-  actualizarPosicion(@Param('id') id: string, @Body() body: { lat: number; lng: number }) {
-    return this.viajesService.actualizarPosicion(id, body.lat, body.lng);
+  @Roles(RolNombre.CONDUCTOR)
+  @ApiOperation({ summary: 'Actualizar posición GPS del bus (solo el conductor del viaje)' })
+  actualizarPosicion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('userId') usuarioId: string,
+    @Body() dto: ActualizarPosicionDto,
+  ) {
+    return this.viajesService.actualizarPosicionComoConductor(id, usuarioId, dto.lat, dto.lng);
   }
 
   @Post(':id/finalizar')
-  @ApiOperation({ summary: 'Conductor finaliza ruta y genera liquidación' })
-  finalizar(@Param('id') id: string, @Body() body: { conductorId: string }) {
-    return this.viajesService.finalizarViaje(id, body.conductorId);
+  @Roles(RolNombre.CONDUCTOR)
+  @ApiOperation({ summary: 'Conductor autenticado finaliza ruta y genera liquidación' })
+  finalizar(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('userId') usuarioId: string) {
+    return this.viajesService.finalizarViaje(id, usuarioId);
   }
 
-  @Get('conductor/:conductorId/activo')
-  @ApiOperation({ summary: 'Obtener viaje activo del conductor' })
-  viajeActivo(@Param('conductorId') id: string) {
-    return this.viajesService.obtenerViajeActivo(id);
+  @Get('mi-activo')
+  @Roles(RolNombre.CONDUCTOR)
+  @ApiOperation({ summary: 'Viaje activo del conductor autenticado' })
+  miViajeActivo(@CurrentUser('userId') usuarioId: string) {
+    return this.viajesService.obtenerMiViajeActivo(usuarioId);
   }
 
   @Get(':id/parada/:paradaId/pasajeros')
+  @Roles(RolNombre.CONDUCTOR)
   @ApiOperation({ summary: 'Pasajeros esperando en una parada (vista conductor)' })
-  pasajerosEnParada(@Param('id') viajeId: string, @Param('paradaId') paradaId: string) {
-    return this.viajesService['dataSource'].query(
-      `EXEC sp_pasajeros_en_parada @viaje_id = @0, @parada_id = @1`,
-      [viajeId, parseInt(paradaId)],
-    );
+  pasajerosEnParada(
+    @Param('id', ParseUUIDPipe) viajeId: string,
+    @Param('paradaId', ParseIntPipe) paradaId: number,
+  ) {
+    return this.viajesService.pasajerosEnParada(viajeId, paradaId);
   }
 }

@@ -19,12 +19,12 @@ export class Parada {
   @Column()
   orden: number;
 
-  // lat/lng almacenados por separado; la columna geography se maneja via raw SQL
-  @Column({ type: 'float', nullable: true })
-  lat: number;
+  // Bug de integración corregido en T-12: la tabla paradas NO tiene columnas
+  // lat/lng — solo `ubicacion geography` (se escribe/lee con SQL crudo, ver
+  // RutasService). Propiedades de transporte, NO persistidas.
+  lat?: number;
 
-  @Column({ type: 'float', nullable: true })
-  lng: number;
+  lng?: number;
 
   @Column({ length: 300, nullable: true })
   referencia: string;

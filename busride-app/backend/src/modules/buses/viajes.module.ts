@@ -5,6 +5,8 @@ import { ViajesService } from './viajes.service';
 import { ViajesController } from './viajes.controller';
 import { TrackingGateway } from './tracking.gateway';
 
+// JwtService (WsJwtGuard del TrackingGateway, F9) llega del JwtModule GLOBAL
+// registrado en AuthModule (T-12) — secreto compartido vía JWT_SECRET.
 @Module({
   imports: [TypeOrmModule.forFeature([Viaje])],
   providers: [ViajesService, TrackingGateway],

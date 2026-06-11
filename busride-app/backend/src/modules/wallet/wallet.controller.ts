@@ -1,8 +1,13 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { WalletService } from './wallet.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser, Roles, RolNombre } from '../../common';
+import { ComprarPaqueteDto } from './dto/comprar-paquete.dto';
+import { HistorialQueryDto } from './dto/historial-query.dto';
 
+// La identidad del pasajero se deriva SIEMPRE del JWT (@CurrentUser),
+// nunca de params o body (resuelve F4). RolesGuard es global (APP_GUARD).
 @ApiTags('Wallet')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
@@ -10,30 +15,31 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 export class WalletController {
   constructor(private readonly walletService: WalletService) {}
 
+  // Público autenticado: cualquier usuario con JWT válido puede ver el catálogo
   @Get('paquetes')
   @ApiOperation({ summary: 'Listar paquetes de viajes disponibles' })
   listarPaquetes() {
     return this.walletService.listarPaquetes();
   }
 
-  @Get(':pasajeroId')
-  @ApiOperation({ summary: 'Consultar saldo del pasajero' })
-  obtenerSaldo(@Param('pasajeroId') id: string) {
-    return this.walletService.obtenerSaldo(id);
+  @Get('mi-saldo')
+  @Roles(RolNombre.PASAJERO)
+  @ApiOperation({ summary: 'Consultar el saldo del pasajero autenticado' })
+  miSaldo(@CurrentUser('userId') userId: string) {
+    return this.walletService.obtenerMiSaldo(userId);
   }
 
-  @Post(':pasajeroId/comprar')
-  @ApiOperation({ summary: 'Comprar paquete de viajes' })
-  comprarPaquete(
-    @Param('pasajeroId') id: string,
-    @Body() body: { paqueteId: number; referenciaExternal: string },
-  ) {
-    return this.walletService.comprarPaquete(id, body.paqueteId, body.referenciaExternal);
+  @Post('comprar')
+  @Roles(RolNombre.PASAJERO)
+  @ApiOperation({ summary: 'Comprar paquete de viajes (idempotente por referenciaExterna)' })
+  comprarPaquete(@CurrentUser('userId') userId: string, @Body() dto: ComprarPaqueteDto) {
+    return this.walletService.comprarPaquete(userId, dto);
   }
 
-  @Get(':pasajeroId/historial')
-  @ApiOperation({ summary: 'Historial de transacciones' })
-  historial(@Param('pasajeroId') id: string) {
-    return this.walletService.historialTransacciones(id);
+  @Get('historial')
+  @Roles(RolNombre.PASAJERO)
+  @ApiOperation({ summary: 'Historial de transacciones del pasajero autenticado' })
+  historial(@CurrentUser('userId') userId: string, @Query() query: HistorialQueryDto) {
+    return this.walletService.historialTransacciones(userId, query.limite);
   }
 }

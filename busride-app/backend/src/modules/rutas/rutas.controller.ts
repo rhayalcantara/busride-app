@@ -1,7 +1,10 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { RutasService, BuscarRutasDto } from './rutas.service';
+import { RutasService } from './rutas.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser, Roles, RolNombre, UsuarioAutenticado } from '../../common';
+import { BuscarRutasDto } from './dto/buscar-rutas.dto';
+import { CrearRutaDto } from './dto/crear-ruta.dto';
 
 @ApiTags('Rutas')
 @ApiBearerAuth()
@@ -17,24 +20,27 @@ export class RutasController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Crear ruta (solo asociación)' })
-  crearRuta(@Body() body: any) {
-    return this.rutasService.crearRuta(body.asociacionId, body);
+  @Roles(RolNombre.ADMIN, RolNombre.ASOCIACION)
+  @ApiOperation({ summary: 'Crear ruta con paradas (asociación: la suya; admin: indica asociacionId)' })
+  crearRuta(@CurrentUser() user: UsuarioAutenticado, @Body() dto: CrearRutaDto) {
+    return this.rutasService.crearRutaComoUsuario(user, dto);
   }
 
   @Get('asociacion/:asociacionId')
-  listarPorAsociacion(@Param('asociacionId') id: string) {
+  @ApiOperation({ summary: 'Rutas activas de una asociación' })
+  listarPorAsociacion(@Param('asociacionId', ParseUUIDPipe) id: string) {
     return this.rutasService.listarRutasPorAsociacion(id);
   }
 
   @Get(':id')
-  obtenerRuta(@Param('id') id: string) {
+  @ApiOperation({ summary: 'Detalle de una ruta con paradas y asociación' })
+  obtenerRuta(@Param('id', ParseUUIDPipe) id: string) {
     return this.rutasService.obtenerRuta(id);
   }
 
   @Get(':id/paradas')
   @ApiOperation({ summary: 'Paradas con coordenadas lat/lng' })
-  obtenerParadas(@Param('id') id: string) {
+  obtenerParadas(@Param('id', ParseUUIDPipe) id: string) {
     return this.rutasService.obtenerParadasConUbicacion(id);
   }
 }

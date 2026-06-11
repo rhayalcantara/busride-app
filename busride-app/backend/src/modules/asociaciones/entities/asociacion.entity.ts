@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 
 @Entity('asociaciones')
@@ -36,6 +36,13 @@ export class Asociacion {
 
   @Column({ name: 'fecha_aprobacion', type: 'datetime2', nullable: true })
   fechaAprobacion: Date;
+
+  @Column({ name: 'aprobado_por', type: 'uniqueidentifier', nullable: true })
+  aprobadoPor: string;
+
+  @ManyToOne(() => Usuario)
+  @JoinColumn({ name: 'aprobado_por' })
+  aprobadoPorUsuario: Usuario;
 
   @CreateDateColumn({ name: 'fecha_creacion' })
   fechaCreacion: Date;
