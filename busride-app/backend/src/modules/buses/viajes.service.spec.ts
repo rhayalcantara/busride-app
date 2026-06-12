@@ -260,4 +260,74 @@ describe('ViajesService', () => {
       expect(resultado).toMatchObject({ viajeId: VIAJE_ID, lat: 18.5, lng: -69.9 });
     });
   });
+
+  // F-09a: detalle del viaje para cualquier usuario autenticado
+  describe('obtenerDetalle', () => {
+    it('lanza NotFoundException si el viaje no existe', async () => {
+      // Arrange
+      viajeRepoMock.findOne.mockResolvedValueOnce(null);
+
+      // Act + Assert
+      await expect(service.obtenerDetalle('no-existe')).rejects.toThrow(
+        new NotFoundException('Viaje no encontrado'),
+      );
+      expect(dataSourceMock.query).not.toHaveBeenCalled();
+    });
+
+    it('devuelve estado, ruta, asientos y la última posición leída de la columna geography', async () => {
+      // Arrange
+      const fechaPosicion = new Date('2026-06-11T10:00:00Z');
+      viajeRepoMock.findOne.mockResolvedValueOnce({
+        id: VIAJE_ID,
+        estado: EstadoViaje.EN_CURSO,
+        rutaId: 'ruta-1',
+        ruta: { id: 'ruta-1', nombre: 'Ruta Centro' },
+        asientosDisponibles: 9,
+        fechaPosicion,
+        fechaInicio: new Date('2026-06-11T09:00:00Z'),
+        fechaFin: null,
+      });
+      dataSourceMock.query.mockResolvedValueOnce([{ lat: 18.4861, lng: -69.9312 }]);
+
+      // Act
+      const resultado = await service.obtenerDetalle(VIAJE_ID);
+
+      // Assert: la posición sale de posicion_actual.Lat/.Long via SQL crudo
+      expect(dataSourceMock.query).toHaveBeenCalledWith(
+        expect.stringContaining('posicion_actual.Lat'),
+        [VIAJE_ID],
+      );
+      expect(resultado).toEqual({
+        id: VIAJE_ID,
+        estado: EstadoViaje.EN_CURSO,
+        ruta: { id: 'ruta-1', nombre: 'Ruta Centro' },
+        asientosDisponibles: 9,
+        posicion: { lat: 18.4861, lng: -69.9312, timestamp: fechaPosicion },
+        fechaInicio: new Date('2026-06-11T09:00:00Z'),
+        fechaFin: null,
+      });
+    });
+
+    it('devuelve posicion=null cuando el bus aún no ha reportado posición', async () => {
+      // Arrange
+      viajeRepoMock.findOne.mockResolvedValueOnce({
+        id: VIAJE_ID,
+        estado: EstadoViaje.EN_CURSO,
+        rutaId: 'ruta-1',
+        ruta: { id: 'ruta-1', nombre: 'Ruta Centro' },
+        asientosDisponibles: 20,
+        fechaPosicion: null,
+        fechaInicio: null,
+        fechaFin: null,
+      });
+      dataSourceMock.query.mockResolvedValueOnce([{ lat: null, lng: null }]);
+
+      // Act
+      const resultado = await service.obtenerDetalle(VIAJE_ID);
+
+      // Assert
+      expect(resultado.posicion).toBeNull();
+      expect(resultado.asientosDisponibles).toBe(20);
+    });
+  });
 });

@@ -66,4 +66,13 @@ export class ViajesController {
   ) {
     return this.viajesService.pasajerosEnParada(viajeId, paradaId);
   }
+
+  // OJO: declarada al FINAL para que ':id' no capture 'mi-activo' ni 'iniciar'.
+  // Sin @Roles: cualquier usuario autenticado (el pasajero la necesita para
+  // pintar el viaje en vivo antes del primer evento de socket).
+  @Get(':id')
+  @ApiOperation({ summary: 'Detalle de un viaje: estado, ruta, asientos y última posición (cualquier usuario autenticado)' })
+  detalle(@Param('id', ParseUUIDPipe) id: string) {
+    return this.viajesService.obtenerDetalle(id);
+  }
 }

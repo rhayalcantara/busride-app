@@ -1,11 +1,13 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { RolNombre } from '../../common';
 import { Asociacion } from './entities/asociacion.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Ruta } from '../rutas/entities/ruta.entity';
@@ -18,6 +20,8 @@ export const ESTADO_ASOCIACION = {
   ACTIVA: 'ACTIVA',
   SUSPENDIDA: 'SUSPENDIDA',
 } as const;
+
+export type EstadoAsociacion = (typeof ESTADO_ASOCIACION)[keyof typeof ESTADO_ASOCIACION];
 
 @Injectable()
 export class AsociacionesService {
@@ -52,6 +56,32 @@ export class AsociacionesService {
       where: { estado: ESTADO_ASOCIACION.ACTIVA },
       order: { nombre: 'ASC' },
     });
+  }
+
+  // F-09a: sin estado se mantiene el comportamiento original (solo ACTIVAS,
+  // cualquier usuario autenticado); el filtro por estado es exclusivo del admin.
+  async listar(rolUsuario: string, estado?: EstadoAsociacion): Promise<Asociacion[]> {
+    if (estado === undefined) {
+      return this.listarActivas();
+    }
+    if (rolUsuario !== RolNombre.ADMIN) {
+      throw new ForbiddenException('Solo un administrador puede filtrar asociaciones por estado');
+    }
+    return this.asociacionRepository.find({
+      where: { estado },
+      order: { nombre: 'ASC' },
+    });
+  }
+
+  // F-09a: asociación vinculada al usuario autenticado (rol asociacion)
+  async obtenerMia(usuarioId: string): Promise<Asociacion> {
+    const asociacion = await this.asociacionRepository.findOne({ where: { usuarioId } });
+    if (!asociacion) {
+      throw new NotFoundException(
+        'Tu usuario no tiene una asociación vinculada. Contacta al administrador.',
+      );
+    }
+    return asociacion;
   }
 
   // Detalle de una asociación con sus rutas

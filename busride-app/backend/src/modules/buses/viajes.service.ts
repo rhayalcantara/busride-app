@@ -147,6 +147,37 @@ export class ViajesService {
     });
   }
 
+  // Detalle para cualquier usuario autenticado (F-09a): el pasajero lo usa para
+  // pintar estado/última posición antes del primer evento de socket. La columna
+  // geography `posicion_actual` NO está mapeada en la entidad: se lee con SQL
+  // crudo (.Lat/.Long), mismo patrón que actualizarPosicion.
+  async obtenerDetalle(viajeId: string) {
+    const viaje = await this.viajeRepo.findOne({
+      where: { id: viajeId },
+      relations: ['ruta'],
+    });
+    if (!viaje) throw new NotFoundException('Viaje no encontrado');
+
+    const [pos] = await this.dataSource.query(
+      `SELECT posicion_actual.Lat AS lat, posicion_actual.Long AS lng
+       FROM viajes WHERE id = @0`,
+      [viajeId],
+    );
+
+    return {
+      id:                  viaje.id,
+      estado:              viaje.estado,
+      ruta:                { id: viaje.rutaId, nombre: viaje.ruta?.nombre ?? null },
+      asientosDisponibles: viaje.asientosDisponibles,
+      posicion:
+        pos?.lat != null && pos?.lng != null
+          ? { lat: pos.lat, lng: pos.lng, timestamp: viaje.fechaPosicion ?? null }
+          : null,
+      fechaInicio:         viaje.fechaInicio ?? null,
+      fechaFin:            viaje.fechaFin ?? null,
+    };
+  }
+
   // Pasajeros con reserva esperando en una parada del viaje (F16:
   // antes el controller accedía a this.viajesService['dataSource']).
   async pasajerosEnParada(viajeId: string, paradaId: number) {

@@ -103,8 +103,11 @@ export class TrackingGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     return { ok: true };
   }
 
-  // Emitir nueva disponibilidad de asientos a pasajeros buscando esta ruta
-  emitirDisponibilidadActualizada(rutaId: string, asientosLibres: number) {
-    this.server.emit('disponibilidad_actualizada', { rutaId, asientosLibres });
+  // Emitir nueva disponibilidad de asientos tras un abordaje (F-09a: lo invoca
+  // ReservasService.confirmarAbordaje). Se emite a todo el namespace /tracking:
+  // los suscritos a la sala viaje_<id> lo usan para el "asientos en vivo" y
+  // cualquier cliente buscando rutas puede filtrar por viajeId.
+  emitirDisponibilidadActualizada(viajeId: string, asientosDisponibles: number) {
+    this.server.emit('disponibilidad_actualizada', { viajeId, asientosDisponibles });
   }
 }

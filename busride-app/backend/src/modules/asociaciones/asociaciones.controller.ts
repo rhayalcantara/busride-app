@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -15,6 +16,7 @@ import { AsociacionesService } from './asociaciones.service';
 import { CrearAsociacionDto } from './dto/crear-asociacion.dto';
 import { ActualizarAsociacionDto } from './dto/actualizar-asociacion.dto';
 import { VincularUsuarioAdminDto } from './dto/vincular-usuario-admin.dto';
+import { ListarAsociacionesDto } from './dto/listar-asociaciones.dto';
 
 @ApiTags('Asociaciones')
 @ApiBearerAuth()
@@ -31,9 +33,19 @@ export class AsociacionesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar asociaciones activas (cualquier usuario autenticado)' })
-  listarActivas() {
-    return this.asociacionesService.listarActivas();
+  @ApiOperation({
+    summary: 'Listar asociaciones: activas por defecto; un admin puede filtrar por ?estado=',
+  })
+  listar(@CurrentUser('rol') rol: string, @Query() query: ListarAsociacionesDto) {
+    return this.asociacionesService.listar(rol, query.estado);
+  }
+
+  // OJO: declarada ANTES de GET :id para que ':id' no capture 'mia'
+  @Get('mia')
+  @Roles(RolNombre.ASOCIACION)
+  @ApiOperation({ summary: 'Asociación vinculada al usuario autenticado (rol asociacion)' })
+  miAsociacion(@CurrentUser('userId') usuarioId: string) {
+    return this.asociacionesService.obtenerMia(usuarioId);
   }
 
   @Get(':id')

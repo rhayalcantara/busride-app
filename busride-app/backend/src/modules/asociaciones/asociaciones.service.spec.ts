@@ -1,6 +1,12 @@
 import { Test } from '@nestjs/testing';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { RolNombre } from '../../common';
 import { AsociacionesService, ESTADO_ASOCIACION } from './asociaciones.service';
 import { Asociacion } from './entities/asociacion.entity';
 import { CrearAsociacionDto } from './dto/crear-asociacion.dto';
@@ -77,6 +83,79 @@ describe('AsociacionesService', () => {
         expect.objectContaining({ estado: ESTADO_ASOCIACION.PENDIENTE }),
       );
       expect(resultado).toMatchObject({ id: ASOCIACION_ID, estado: ESTADO_ASOCIACION.PENDIENTE });
+    });
+  });
+
+  // F-09a: listado con filtro opcional por estado (solo admin)
+  describe('listar', () => {
+    it('sin estado mantiene el comportamiento original: solo ACTIVAS, para cualquier rol', async () => {
+      // Arrange
+      const activas = [{ id: ASOCIACION_ID, estado: ESTADO_ASOCIACION.ACTIVA }];
+      asociacionRepoMock.find.mockResolvedValueOnce(activas);
+
+      // Act
+      const resultado = await service.listar(RolNombre.PASAJERO);
+
+      // Assert
+      expect(asociacionRepoMock.find).toHaveBeenCalledWith({
+        where: { estado: ESTADO_ASOCIACION.ACTIVA },
+        order: { nombre: 'ASC' },
+      });
+      expect(resultado).toBe(activas);
+    });
+
+    it('lanza ForbiddenException si un rol no admin intenta filtrar por estado', async () => {
+      // Act + Assert
+      await expect(
+        service.listar(RolNombre.ASOCIACION, ESTADO_ASOCIACION.PENDIENTE),
+      ).rejects.toThrow(ForbiddenException);
+      expect(asociacionRepoMock.find).not.toHaveBeenCalled();
+    });
+
+    it('permite al admin filtrar por estado PENDIENTE', async () => {
+      // Arrange
+      const pendientes = [{ id: ASOCIACION_ID, estado: ESTADO_ASOCIACION.PENDIENTE }];
+      asociacionRepoMock.find.mockResolvedValueOnce(pendientes);
+
+      // Act
+      const resultado = await service.listar(RolNombre.ADMIN, ESTADO_ASOCIACION.PENDIENTE);
+
+      // Assert
+      expect(asociacionRepoMock.find).toHaveBeenCalledWith({
+        where: { estado: ESTADO_ASOCIACION.PENDIENTE },
+        order: { nombre: 'ASC' },
+      });
+      expect(resultado).toBe(pendientes);
+    });
+  });
+
+  // F-09a: asociación vinculada al usuario autenticado
+  describe('obtenerMia', () => {
+    it('devuelve la asociación vinculada al usuarioId del JWT', async () => {
+      // Arrange
+      const asociacion = { id: ASOCIACION_ID, usuarioId: 'usuario-1' };
+      asociacionRepoMock.findOne.mockResolvedValueOnce(asociacion);
+
+      // Act
+      const resultado = await service.obtenerMia('usuario-1');
+
+      // Assert
+      expect(asociacionRepoMock.findOne).toHaveBeenCalledWith({
+        where: { usuarioId: 'usuario-1' },
+      });
+      expect(resultado).toBe(asociacion);
+    });
+
+    it('lanza NotFoundException con mensaje claro si el usuario no tiene asociación', async () => {
+      // Arrange
+      asociacionRepoMock.findOne.mockResolvedValueOnce(null);
+
+      // Act + Assert
+      await expect(service.obtenerMia('usuario-sin-asociacion')).rejects.toThrow(
+        new NotFoundException(
+          'Tu usuario no tiene una asociación vinculada. Contacta al administrador.',
+        ),
+      );
     });
   });
 

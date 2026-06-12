@@ -4,6 +4,7 @@ import { LiquidacionService } from './liquidacion.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolNombre, CurrentUser } from '../../common';
 import { PagarLiquidacionDto } from './dto/pagar-liquidacion.dto';
+import { ListarLiquidacionesDto } from './dto/listar-liquidaciones.dto';
 
 // El conductor solo consulta SUS liquidaciones (identidad desde el JWT, F4).
 // RolesGuard ya es global (APP_GUARD).
@@ -13,6 +14,13 @@ import { PagarLiquidacionDto } from './dto/pagar-liquidacion.dto';
 @Controller('liquidaciones')
 export class LiquidacionController {
   constructor(private readonly liquidacionService: LiquidacionService) {}
+
+  @Get()
+  @Roles(RolNombre.ADMIN)
+  @ApiOperation({ summary: 'Listado de liquidaciones con conductor y ruta, filtro opcional por estado (solo admin)' })
+  listar(@Query() query: ListarLiquidacionesDto) {
+    return this.liquidacionService.listarTodas(query.estado);
+  }
 
   @Get('mias')
   @Roles(RolNombre.CONDUCTOR)

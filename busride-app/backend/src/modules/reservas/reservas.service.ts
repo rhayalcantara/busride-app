@@ -2,9 +2,10 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { Reserva } from './entities/reserva.entity';
+import { Reserva, EstadoReserva } from './entities/reserva.entity';
 import { CrearReservaDto } from './dto/crear-reserva.dto';
 import { ConfirmarAbordajeDto } from './dto/confirmar-abordaje.dto';
+import { TrackingGateway } from '../buses/tracking.gateway';
 import * as QRCode from 'qrcode';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class ReservasService {
     @InjectRepository(Reserva) private reservaRepo: Repository<Reserva>,
     private dataSource: DataSource,
     private jwtService: JwtService,
+    private trackingGateway: TrackingGateway,
   ) {}
 
   // Mapea el userId del JWT al perfil de pasajero (F4: la identidad nunca viene del body)
@@ -96,9 +98,11 @@ export class ReservasService {
   async confirmarAbordaje(userId: string, dto: ConfirmarAbordajeDto) {
     const conductorId = await this.resolverConductorId(userId);
 
-    // Verificar JWT del QR antes de llamar al SP
+    // Verificar JWT del QR antes de llamar al SP (su payload trae el viajeId,
+    // necesario para emitir la disponibilidad actualizada tras el abordaje)
+    let qrPayload: { viajeId?: string };
     try {
-      this.jwtService.verify(dto.qrToken);
+      qrPayload = this.jwtService.verify(dto.qrToken);
     } catch {
       throw new BadRequestException('QR inválido o expirado');
     }
@@ -118,6 +122,16 @@ export class ReservasService {
     const res = resultado[0];
     if (!res.exito) throw new BadRequestException(res.mensaje);
 
+    // F-09a: notificar la nueva disponibilidad por Socket.IO (asientos en vivo).
+    // Solo el abordaje cambia asientos_disponibles: sp_crear_reserva y
+    // sp_expirar_reservas no tocan la disponibilidad, por eso no emiten.
+    if (qrPayload?.viajeId && res.asientos_restantes != null) {
+      this.trackingGateway.emitirDisponibilidadActualizada(
+        qrPayload.viajeId,
+        res.asientos_restantes,
+      );
+    }
+
     return {
       abordajeId:        res.abordaje_id,
       ticketCodigo:      res.ticket_codigo,
@@ -134,14 +148,36 @@ export class ReservasService {
     );
   }
 
-  // Historial de reservas del pasajero autenticado (reemplaza al listado por :pasajeroId)
+  // Historial de reservas del pasajero autenticado (reemplaza al listado por :pasajeroId).
+  // F-09a: cada reserva incluye `calificada` — true solo para reservas ABORDADAS
+  // cuyo abordaje ya tiene calificación (calificaciones.abordaje_id es UNIQUE).
   async listarMisReservas(userId: string) {
     const pasajeroId = await this.resolverPasajeroId(userId);
 
-    return this.reservaRepo.find({
+    const reservas = await this.reservaRepo.find({
       where: { pasajeroId },
       relations: ['viaje', 'viaje.ruta', 'paradaOrigen', 'paradaDestino'],
       order: { fechaCreacion: 'DESC' },
     });
+
+    // Reservas cuyo abordaje ya fue calificado por este pasajero
+    const filas = await this.dataSource.query(
+      `SELECT a.reserva_id
+       FROM abordajes a
+       INNER JOIN calificaciones c ON c.abordaje_id = a.id
+       WHERE a.pasajero_id = @0`,
+      [pasajeroId],
+    );
+    // Comparación de UUIDs case-insensitive (SQL Server los devuelve en mayúsculas)
+    const reservasCalificadas = new Set<string>(
+      (filas ?? []).map((f: { reserva_id: string }) => String(f.reserva_id).toLowerCase()),
+    );
+
+    return reservas.map((reserva) => ({
+      ...reserva,
+      calificada:
+        reserva.estado === EstadoReserva.ABORDADA &&
+        reservasCalificadas.has(String(reserva.id).toLowerCase()),
+    }));
   }
 }

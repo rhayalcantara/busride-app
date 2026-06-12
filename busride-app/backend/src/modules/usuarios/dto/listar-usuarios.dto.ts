@@ -1,8 +1,20 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { RolNombre } from '../../../common';
 
 export class ListarUsuariosDto {
+  @ApiPropertyOptional({
+    enum: RolNombre,
+    description: 'Filtrar por nombre de rol',
+    example: RolNombre.CONDUCTOR,
+  })
+  @IsOptional()
+  @IsEnum(RolNombre, {
+    message: 'El rol debe ser uno de: admin, asociacion, conductor, pasajero',
+  })
+  rol?: RolNombre;
+
   @ApiPropertyOptional({ example: 1, default: 1, description: 'Número de página (desde 1)' })
   @IsOptional()
   @Type(() => Number)

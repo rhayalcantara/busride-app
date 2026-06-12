@@ -4,9 +4,10 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ReservasService } from './reservas.service';
-import { Reserva } from './entities/reserva.entity';
+import { Reserva, EstadoReserva } from './entities/reserva.entity';
 import { CrearReservaDto } from './dto/crear-reserva.dto';
 import { ConfirmarAbordajeDto } from './dto/confirmar-abordaje.dto';
+import { TrackingGateway } from '../buses/tracking.gateway';
 import * as QRCode from 'qrcode';
 
 jest.mock('qrcode', () => ({
@@ -19,6 +20,7 @@ describe('ReservasService', () => {
   const dataSourceMock = { query: jest.fn() };
   const jwtServiceMock = { sign: jest.fn(), verify: jest.fn() };
   const reservaRepoMock = { find: jest.fn() };
+  const trackingGatewayMock = { emitirDisponibilidadActualizada: jest.fn() };
 
   const USER_ID = 'usuario-1';
   const PASAJERO_ID = 'pasajero-1';
@@ -46,6 +48,7 @@ describe('ReservasService', () => {
         { provide: getRepositoryToken(Reserva), useValue: reservaRepoMock },
         { provide: DataSource, useValue: dataSourceMock },
         { provide: JwtService, useValue: jwtServiceMock },
+        { provide: TrackingGateway, useValue: trackingGatewayMock },
       ],
     }).compile();
 
@@ -160,17 +163,18 @@ describe('ReservasService', () => {
       expect(dataSourceMock.query).toHaveBeenCalledTimes(1);
     });
 
-    it('lanza BadRequestException con el mensaje del SP cuando exito=false', async () => {
+    it('lanza BadRequestException con el mensaje del SP cuando exito=false (y NO emite disponibilidad)', async () => {
       // Arrange
       dataSourceMock.query
         .mockResolvedValueOnce([{ id: CONDUCTOR_ID }])
         .mockResolvedValueOnce([{ exito: false, mensaje: 'Reserva ya abordada' }]);
-      jwtServiceMock.verify.mockReturnValue({ tipo: 'ABORDAJE' });
+      jwtServiceMock.verify.mockReturnValue({ tipo: 'ABORDAJE', viajeId: 'viaje-1' });
 
       // Act + Assert
       await expect(service.confirmarAbordaje(USER_ID, dtoAbordaje)).rejects.toThrow(
         new BadRequestException('Reserva ya abordada'),
       );
+      expect(trackingGatewayMock.emitirDisponibilidadActualizada).not.toHaveBeenCalled();
     });
 
     // B5 (Ola 6): recordset vacío del SP → error controlado, no TypeError/500
@@ -199,7 +203,7 @@ describe('ReservasService', () => {
           monto: 50,
           asientos_restantes: 12,
         }]);
-      jwtServiceMock.verify.mockReturnValue({ tipo: 'ABORDAJE' });
+      jwtServiceMock.verify.mockReturnValue({ tipo: 'ABORDAJE', viajeId: 'viaje-1' });
 
       // Act
       const resultado = await service.confirmarAbordaje(USER_ID, dtoAbordaje);
@@ -217,13 +221,38 @@ describe('ReservasService', () => {
         asientosRestantes: 12,
       });
     });
+
+    // F-09a: el abordaje exitoso emite la nueva disponibilidad por Socket.IO
+    it('emite disponibilidad_actualizada con el viajeId del QR y los asientos restantes del SP', async () => {
+      // Arrange
+      dataSourceMock.query
+        .mockResolvedValueOnce([{ id: CONDUCTOR_ID }])
+        .mockResolvedValueOnce([{
+          exito: true,
+          abordaje_id: 'abordaje-1',
+          ticket_codigo: 'TCK-001',
+          asiento: 7,
+          monto: 50,
+          asientos_restantes: 12,
+        }]);
+      jwtServiceMock.verify.mockReturnValue({ tipo: 'ABORDAJE', viajeId: 'viaje-1' });
+
+      // Act
+      await service.confirmarAbordaje(USER_ID, dtoAbordaje);
+
+      // Assert
+      expect(trackingGatewayMock.emitirDisponibilidadActualizada).toHaveBeenCalledTimes(1);
+      expect(trackingGatewayMock.emitirDisponibilidadActualizada).toHaveBeenCalledWith('viaje-1', 12);
+    });
   });
 
   describe('listarMisReservas', () => {
     it('busca las reservas del pasajero resuelto desde el JWT ordenadas por fecha', async () => {
       // Arrange
-      dataSourceMock.query.mockResolvedValueOnce([{ id: PASAJERO_ID }]);
-      const reservas = [{ id: 'reserva-1' }];
+      dataSourceMock.query
+        .mockResolvedValueOnce([{ id: PASAJERO_ID }]) // resolverPasajeroId
+        .mockResolvedValueOnce([]); // sin calificaciones
+      const reservas = [{ id: 'reserva-1', estado: EstadoReserva.PROVISIONAL }];
       reservaRepoMock.find.mockResolvedValueOnce(reservas);
 
       // Act
@@ -236,7 +265,36 @@ describe('ReservasService', () => {
           order: { fechaCreacion: 'DESC' },
         }),
       );
-      expect(resultado).toBe(reservas);
+      expect(resultado).toEqual([
+        { id: 'reserva-1', estado: EstadoReserva.PROVISIONAL, calificada: false },
+      ]);
+    });
+
+    // F-09a: flag `calificada` para reservas ABORDADAS con calificación existente
+    it('marca calificada=true solo en la ABORDADA cuyo abordaje ya tiene calificación (UUIDs case-insensitive)', async () => {
+      // Arrange
+      dataSourceMock.query
+        .mockResolvedValueOnce([{ id: PASAJERO_ID }]) // resolverPasajeroId
+        .mockResolvedValueOnce([{ reserva_id: 'RESERVA-ABORDADA-1' }]); // ya calificada (mayúsculas, como SQL Server)
+      reservaRepoMock.find.mockResolvedValueOnce([
+        { id: 'reserva-abordada-1', estado: EstadoReserva.ABORDADA },
+        { id: 'reserva-abordada-2', estado: EstadoReserva.ABORDADA },
+        { id: 'reserva-abordada-1-fantasma', estado: EstadoReserva.EXPIRADA },
+      ]);
+
+      // Act
+      const resultado = await service.listarMisReservas(USER_ID);
+
+      // Assert: la query de calificaciones une abordajes con calificaciones del pasajero
+      expect(dataSourceMock.query).toHaveBeenLastCalledWith(
+        expect.stringContaining('INNER JOIN calificaciones'),
+        [PASAJERO_ID],
+      );
+      expect(resultado).toEqual([
+        { id: 'reserva-abordada-1', estado: EstadoReserva.ABORDADA, calificada: true },
+        { id: 'reserva-abordada-2', estado: EstadoReserva.ABORDADA, calificada: false },
+        { id: 'reserva-abordada-1-fantasma', estado: EstadoReserva.EXPIRADA, calificada: false },
+      ]);
     });
   });
 });

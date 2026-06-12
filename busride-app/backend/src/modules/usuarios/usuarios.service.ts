@@ -65,9 +65,10 @@ export class UsuariosService {
     return { mensaje: 'Contraseña actualizada correctamente' };
   }
 
-  // Listado paginado de usuarios (solo admin)
-  async listar(pagina = 1, limite = 20) {
+  // Listado paginado de usuarios (solo admin), con filtro opcional por nombre de rol (F-09a)
+  async listar(pagina = 1, limite = 20, rol?: string) {
     const [usuarios, total] = await this.usuarioRepo.findAndCount({
+      where: rol ? { rol: { nombre: rol } } : undefined,
       relations: ['rol'],
       order: { fechaCreacion: 'DESC' },
       skip: (pagina - 1) * limite,

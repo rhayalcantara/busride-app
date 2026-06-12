@@ -160,6 +160,27 @@ describe('UsuariosService', () => {
       expect(resultado.datos[0]).not.toHaveProperty('passwordHash');
       expect(resultado.datos[0]).not.toHaveProperty('tokenVerificacion');
     });
+
+    // F-09a: filtro opcional por nombre de rol
+    it('filtra por nombre de rol cuando se pasa el parámetro', async () => {
+      usuarioRepo.findAndCount.mockResolvedValue([[{ ...usuarioBase }], 1]);
+
+      await service.listar(1, 20, 'conductor');
+
+      expect(usuarioRepo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { rol: { nombre: 'conductor' } } }),
+      );
+    });
+
+    it('no aplica where cuando no se pasa rol', async () => {
+      usuarioRepo.findAndCount.mockResolvedValue([[{ ...usuarioBase }], 1]);
+
+      await service.listar(1, 20);
+
+      expect(usuarioRepo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ where: undefined }),
+      );
+    });
   });
 
   describe('cambiarEstado', () => {

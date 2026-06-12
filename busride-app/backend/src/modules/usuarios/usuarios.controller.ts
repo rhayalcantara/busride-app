@@ -50,9 +50,9 @@ export class UsuariosController {
 
   @Get()
   @Roles(RolNombre.ADMIN)
-  @ApiOperation({ summary: 'Listado paginado de usuarios (solo admin)' })
+  @ApiOperation({ summary: 'Listado paginado de usuarios, con filtro opcional por rol (solo admin)' })
   listar(@Query() query: ListarUsuariosDto) {
-    return this.usuariosService.listar(query.pagina, query.limite);
+    return this.usuariosService.listar(query.pagina, query.limite, query.rol);
   }
 
   @Patch(':id/estado')

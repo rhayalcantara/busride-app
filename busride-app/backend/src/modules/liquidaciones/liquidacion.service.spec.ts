@@ -26,6 +26,42 @@ describe('LiquidacionService', () => {
     service = moduleRef.get(LiquidacionService);
   });
 
+  // F-09a: listado completo para el panel admin
+  describe('listarTodas', () => {
+    it('consulta todas las liquidaciones con conductor y ruta (estado null = sin filtro)', async () => {
+      // Arrange
+      const liquidaciones = [{ id: LIQUIDACION_ID, conductor_nombre: 'Juan Pérez' }];
+      dataSourceMock.query.mockResolvedValueOnce(liquidaciones);
+
+      // Act
+      const resultado = await service.listarTodas();
+
+      // Assert
+      expect(dataSourceMock.query).toHaveBeenCalledWith(
+        expect.stringContaining('FROM liquidaciones'),
+        [null],
+      );
+      expect(dataSourceMock.query).toHaveBeenCalledWith(
+        expect.stringContaining('conductor_nombre'),
+        [null],
+      );
+      expect(resultado).toBe(liquidaciones);
+    });
+
+    it('pasa el estado como parámetro cuando se filtra (PENDIENTE)', async () => {
+      // Arrange
+      dataSourceMock.query.mockResolvedValueOnce([]);
+
+      // Act
+      await service.listarTodas(EstadoLiquidacion.PENDIENTE);
+
+      // Assert
+      expect(dataSourceMock.query).toHaveBeenCalledWith(expect.any(String), [
+        EstadoLiquidacion.PENDIENTE,
+      ]);
+    });
+  });
+
   describe('obtenerMisLiquidaciones', () => {
     it('lanza NotFoundException si el usuario no tiene perfil de conductor', async () => {
       // Arrange

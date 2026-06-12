@@ -20,6 +20,24 @@ export class LiquidacionService {
     return conductor.id as string;
   }
 
+  // Listado completo para el panel admin (F-09a), con conductor, ruta y fechas
+  // del viaje; filtro opcional por estado (PENDIENTE/PAGADA/EN_PROCESO).
+  async listarTodas(estado?: EstadoLiquidacion) {
+    return this.dataSource.query(`
+      SELECT l.*,
+             u.nombre + ' ' + u.apellido AS conductor_nombre,
+             r.nombre                    AS ruta_nombre,
+             v.fecha_inicio, v.fecha_fin
+      FROM liquidaciones l
+      INNER JOIN conductores c ON c.id = l.conductor_id
+      INNER JOIN usuarios u    ON u.id = c.usuario_id
+      LEFT  JOIN viajes v      ON v.id = l.viaje_id
+      LEFT  JOIN rutas r       ON r.id = v.ruta_id
+      WHERE (@0 IS NULL OR l.estado = @0)
+      ORDER BY l.fecha_creacion DESC
+    `, [estado ?? null]);
+  }
+
   async obtenerMisLiquidaciones(usuarioId: string) {
     const conductorId = await this.resolverConductorId(usuarioId);
     return this.dataSource.query(`
