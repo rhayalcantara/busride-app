@@ -28,6 +28,9 @@ CREATE TABLE usuarios (
     rol_id          INT NOT NULL REFERENCES roles(id),
     activo          BIT DEFAULT 1,
     verificado      BIT DEFAULT 0,
+    -- 1 = credencial provisional (admin seed): debe cambiarla; en producción
+    -- el backend bloquea el resto del API (PasswordCaducadaGuard)
+    debe_cambiar_password BIT NOT NULL DEFAULT 0,
     token_verificacion NVARCHAR(100),
     fecha_creacion  DATETIME2 DEFAULT GETDATE(),
     fecha_actualizacion DATETIME2 DEFAULT GETDATE(),

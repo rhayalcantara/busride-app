@@ -130,8 +130,39 @@ export class AuthService {
         apellido: usuario.apellido,
         email:    usuario.email,
         rol:      usuario.rol?.nombre,
+        // true = credencial provisional: el cliente debe llevar al usuario a
+        // cambiarla (en producción el resto del API queda bloqueado por guard)
+        debeCambiarPassword: usuario.debeCambiarPassword,
       },
     };
+  }
+
+  // Cambia la contraseña del usuario autenticado y limpia debe_cambiar_password.
+  // Revoca TODOS los refresh tokens vigentes (las otras sesiones mueren) y emite
+  // un par nuevo sin el claim dcp para que este cliente siga operando.
+  async cambiarPassword(usuarioId: string, passwordActual: string, passwordNueva: string) {
+    if (passwordNueva === passwordActual) {
+      throw new BadRequestException('La nueva contraseña debe ser distinta de la actual');
+    }
+
+    const usuario = await this.usuarioRepo.findOne({
+      where: { id: usuarioId, activo: true },
+      relations: ['rol'],
+    });
+    if (!usuario) throw new UnauthorizedException('Usuario inactivo o inexistente');
+
+    const passwordValida = await bcrypt.compare(passwordActual, usuario.passwordHash);
+    if (!passwordValida) throw new UnauthorizedException('La contraseña actual es incorrecta');
+
+    const passwordHash = await bcrypt.hash(passwordNueva, 12);
+    await this.usuarioRepo.update(usuario.id, { passwordHash, debeCambiarPassword: false });
+
+    await this.tokenRefrescoRepo.update({ usuarioId, revocado: false }, { revocado: true });
+
+    usuario.debeCambiarPassword = false;
+    const { accessToken, refreshToken } = await this.emitirTokens(usuario);
+
+    return { mensaje: 'Contraseña actualizada', accessToken, refreshToken };
   }
 
   // Valida el refresh token recibido, lo ROTA (revoca el usado) y emite un par nuevo.
@@ -168,7 +199,14 @@ export class AuthService {
   // Emite access token (JWT) + refresh token (string aleatorio opaco, NO JWT).
   // En BD solo se persiste el hash sha256 del refresh token.
   private async emitirTokens(usuario: Usuario) {
-    const payload = { sub: usuario.id, email: usuario.email, rol: usuario.rol?.nombre };
+    // dcp (debe cambiar password) viaja en el token solo cuando aplica:
+    // PasswordCaducadaGuard lo lee sin tocar la BD en cada request.
+    const payload = {
+      sub: usuario.id,
+      email: usuario.email,
+      rol: usuario.rol?.nombre,
+      ...(usuario.debeCambiarPassword ? { dcp: true } : {}),
+    };
     const accessToken = this.jwtService.sign(payload);
 
     const refreshToken = crypto.randomBytes(48).toString('hex');

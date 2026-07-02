@@ -6,6 +6,7 @@ import { AuthService, HOME_POR_ROL, Rol, authGuard, rolGuard } from './core/auth
  * Rutas raíz de la app (cableadas en F-05):
  *
  * - /login y /registro: públicas.
+ * - /cambiar-password: cualquier usuario autenticado (cambio obligatorio).
  * - /pasajero, /conductor, /panel: áreas lazy protegidas con authGuard +
  *   rolGuard. Cada área define sus páginas en su propio `<area>.routes.ts`
  *   (propiedad exclusiva de F-06/F-07/F-08 — aquí solo placeholders).
@@ -22,6 +23,17 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/auth/registro/registro.component').then((m) => m.RegistroComponent),
     title: 'BusRide — Crear cuenta',
+  },
+  {
+    // Cambio de contraseña (obligatorio tras un login con debeCambiarPassword):
+    // requiere sesión activa, válido para CUALQUIER rol autenticado.
+    path: 'cambiar-password',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/auth/cambiar-password/cambiar-password.component').then(
+        (m) => m.CambiarPasswordComponent,
+      ),
+    title: 'BusRide — Cambiar contraseña',
   },
   {
     path: 'pasajero',

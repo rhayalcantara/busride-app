@@ -20,6 +20,8 @@ export interface UsuarioSesion {
   apellido: string;
   email: string;
   rol: Rol;
+  /** true si el backend exige cambiar la contraseña antes de operar. */
+  debeCambiarPassword?: boolean;
 }
 
 /** Sesión completa en memoria: par de tokens + usuario autenticado. */
@@ -61,6 +63,20 @@ export interface RespuestaLogin extends ParTokens {
 export interface RespuestaRegistro {
   mensaje: string;
   usuarioId: string;
+}
+
+/** Cuerpo de POST /auth/cambiar-password (CambiarPasswordDto del backend). */
+export interface DatosCambioPassword {
+  passwordActual: string;
+  passwordNueva: string;
+}
+
+/**
+ * Respuesta de POST /auth/cambiar-password: el backend revoca TODOS los
+ * refresh tokens previos y emite un par de tokens NUEVO.
+ */
+export interface RespuestaCambioPassword extends ParTokens {
+  mensaje: string;
 }
 
 /**

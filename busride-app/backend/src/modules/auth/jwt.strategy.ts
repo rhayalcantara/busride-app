@@ -18,6 +18,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       userId: payload.sub,
       email:  payload.email,
       rol:    payload.rol,
+      // claim dcp: credencial provisional pendiente de cambio (PasswordCaducadaGuard)
+      debeCambiarPassword: payload.dcp === true,
     };
   }
 }

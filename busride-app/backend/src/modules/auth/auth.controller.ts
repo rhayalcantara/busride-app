@@ -2,11 +2,12 @@ import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { CurrentUser, Public, Roles, RolNombre } from '../../common';
+import { CurrentUser, PermitirPasswordCaducada, Public, Roles, RolNombre } from '../../common';
 import { RegistrarDto } from './dto/registrar.dto';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { CambiarPasswordDto } from './dto/cambiar-password.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -51,9 +52,22 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
+  @PermitirPasswordCaducada()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Cerrar sesión (revoca los refresh tokens del usuario)' })
   logout(@CurrentUser('userId') usuarioId: string) {
     return this.authService.logout(usuarioId);
+  }
+
+  // Único endpoint operable (junto a logout) para un usuario con credencial
+  // provisional (debe_cambiar_password, p. ej. el admin seed): en producción
+  // PasswordCaducadaGuard bloquea todo lo demás hasta regularizarse.
+  @Post('cambiar-password')
+  @HttpCode(HttpStatus.OK)
+  @PermitirPasswordCaducada()
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cambiar la contraseña propia (devuelve un par de tokens nuevo)' })
+  cambiarPassword(@CurrentUser('userId') usuarioId: string, @Body() dto: CambiarPasswordDto) {
+    return this.authService.cambiarPassword(usuarioId, dto.passwordActual, dto.passwordNueva);
   }
 }

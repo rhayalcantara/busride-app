@@ -47,6 +47,7 @@ services:
     environment:
       DB_HOST: sqlserver
       SA_PASSWORD: ${SA_PASSWORD:?Define SA_PASSWORD en .env (ver .env.example)}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Define APP_DB_PASSWORD en .env (ver .env.example)}
     volumes:
       - ./database/init:/docker-entrypoint-initdb.d:ro
       - ./database/init.sh:/usr/local/bin/busride-init.sh:ro
@@ -66,8 +67,9 @@ services:
       DB_HOST: sqlserver
       DB_PORT: 1433
       DB_NAME: busride_db
-      DB_USER: sa
-      DB_PASSWORD: ${SA_PASSWORD:?Define SA_PASSWORD en .env (ver .env.example)}
+      # Usuario de aplicación con privilegios mínimos (lo crea 05_app_user.sql)
+      DB_USER: busride_app
+      DB_PASSWORD: ${APP_DB_PASSWORD:?Define APP_DB_PASSWORD en .env (ver .env.example)}
       JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en .env (ver .env.example)}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
       # Origen del frontend (p. ej. https://app.busride.do). Con el proxy

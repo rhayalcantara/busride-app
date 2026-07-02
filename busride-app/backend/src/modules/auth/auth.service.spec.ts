@@ -70,6 +70,7 @@ describe('AuthService', () => {
     nombre: 'Juan',
     apellido: 'Pérez',
     activo: true,
+    debeCambiarPassword: false,
     rol: { id: 4, nombre: 'pasajero' },
   };
 
@@ -134,6 +135,7 @@ describe('AuthService', () => {
         apellido: usuarioBase.apellido,
         email: usuarioBase.email,
         rol: 'pasajero',
+        debeCambiarPassword: false,
       });
       expect(resultado.usuario).not.toHaveProperty('passwordHash');
 
@@ -368,6 +370,66 @@ describe('AuthService', () => {
       await expect(service.refrescar('refresh-token-plano')).rejects.toThrow(UnauthorizedException);
       // No debe rotarse el token si el usuario no es válido
       expect(tokenRefrescoRepo.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cambiarPassword', () => {
+    it('rechaza con BadRequestException si la nueva es igual a la actual', async () => {
+      await expect(
+        service.cambiarPassword('usuario-1', 'Misma123!', 'Misma123!'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(usuarioRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('lanza UnauthorizedException si la contraseña actual no valida', async () => {
+      usuarioRepo.findOne.mockResolvedValue({ ...usuarioBase, debeCambiarPassword: true });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        service.cambiarPassword('usuario-1', 'incorrecta', 'Nueva123!segura'),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(usuarioRepo.update).not.toHaveBeenCalled();
+      expect(jwtService.sign).not.toHaveBeenCalled();
+    });
+
+    it('actualiza el hash, limpia el flag, revoca refresh tokens y emite par nuevo sin dcp', async () => {
+      usuarioRepo.findOne.mockResolvedValue({ ...usuarioBase, debeCambiarPassword: true });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('$2b$12$hash-nuevo');
+      usuarioRepo.update.mockResolvedValue(undefined);
+      tokenRefrescoRepo.update.mockResolvedValue(undefined);
+
+      const resultado = await service.cambiarPassword('usuario-1', 'Vieja123!', 'Nueva123!segura');
+
+      expect(bcrypt.hash).toHaveBeenCalledWith('Nueva123!segura', 12);
+      expect(usuarioRepo.update).toHaveBeenCalledWith('usuario-1', {
+        passwordHash: '$2b$12$hash-nuevo',
+        debeCambiarPassword: false,
+      });
+      // Cierre de sesión global: todos los refresh vigentes quedan revocados
+      expect(tokenRefrescoRepo.update).toHaveBeenCalledWith(
+        { usuarioId: 'usuario-1', revocado: false },
+        { revocado: true },
+      );
+      // El access nuevo NO lleva el claim dcp (flag ya limpio)
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.not.objectContaining({ dcp: true }),
+      );
+      expect(resultado.accessToken).toBe('access-token-firmado');
+      expect(typeof resultado.refreshToken).toBe('string');
+    });
+
+    it('el login de un usuario con flag emite access token con claim dcp', async () => {
+      usuarioRepo.findOne.mockResolvedValue({ ...usuarioBase, debeCambiarPassword: true });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      usuarioRepo.update.mockResolvedValue(undefined);
+
+      const resultado = await service.login({ email: usuarioBase.email, password: 'Secreta123!' });
+
+      expect(jwtService.sign).toHaveBeenCalledWith(expect.objectContaining({ dcp: true }));
+      expect(resultado.usuario.debeCambiarPassword).toBe(true);
     });
   });
 

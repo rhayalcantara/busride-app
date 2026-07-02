@@ -19,6 +19,7 @@ Completar `.env` (jamás commitearlo):
 | Variable | Cómo generarla |
 |---|---|
 | `SA_PASSWORD` | `openssl rand -base64 18` + un símbolo (SQL Server exige 3 de 4 categorías) |
+| `APP_DB_PASSWORD` | Igual que SA_PASSWORD. Password del login `busride_app` (privilegios mínimos: datareader/datawriter/execute) con el que se conecta el backend — nunca `sa` |
 | `JWT_SECRET` | `openssl rand -hex 32` (la app rechaza < 32 chars y secretos de dev conocidos) |
 | `CORS_ORIGIN` | Origen público del frontend, p. ej. `https://app.busride.do` |
 | `FRONTEND_PORT` | Puerto HTTP publicado por nginx (default `80`) |
@@ -36,9 +37,9 @@ Orden automático: `sqlserver` (healthcheck) → `sqlserver-init` (one-shot idem
 
 Solo nginx publica puerto al host; SQL Server y el backend viven en la red interna del stack.
 
-## 4. Primer acceso — OBLIGATORIO
+## 4. Primer acceso
 
-El init siembra `admin@busride.do` / `Admin123!cambiar` (credencial **pública**, está en el repo). **Cambiarla inmediatamente** tras el primer login. _(Pendiente: forzar el cambio en el primer login — ver auditoría, paso 4.)_
+El init siembra `admin@busride.do` / `Admin123!cambiar` (credencial **pública**, está en el repo) **marcada con cambio de contraseña obligatorio**: en producción el backend bloquea todo el API (403) para ese usuario hasta que la cambie (`POST /auth/cambiar-password`; el frontend redirige a `/cambiar-password` automáticamente tras el login). El init re-marca al admin solo mientras conserve el hash publicado.
 
 ## 5. TLS
 

@@ -13,6 +13,7 @@ import { extraerMensajeError } from '../../../shared';
 /**
  * Página de inicio de sesión. Tras autenticar redirige a la home del rol
  * (HOME_POR_ROL) o a `?volverA=` si el authGuard guardó una URL destino.
+ * Si el backend marca `usuario.debeCambiarPassword`, fuerza /cambiar-password.
  */
 @Component({
   selector: 'app-login',
@@ -170,9 +171,20 @@ export class LoginComponent {
 
     this.auth.login(this.formulario.getRawValue()).subscribe({
       next: (respuesta) => {
+        const volverA = this.rutaActiva.snapshot.queryParamMap.get('volverA');
+
+        // Cambio de contraseña OBLIGATORIO: antes de cualquier destino se
+        // fuerza /cambiar-password, propagando ?volverA= para retomar luego.
+        if (respuesta.usuario.debeCambiarPassword) {
+          void this.router.navigate(
+            ['/cambiar-password'],
+            volverA ? { queryParams: { volverA } } : {},
+          );
+          return;
+        }
+
         // Respeta ?volverA= (lo añade authGuard al expulsar a /login);
         // si no viene, a la home del rol autenticado.
-        const volverA = this.rutaActiva.snapshot.queryParamMap.get('volverA');
         void this.router.navigateByUrl(volverA ?? HOME_POR_ROL[respuesta.usuario.rol]);
       },
       error: (error: unknown) => {

@@ -94,7 +94,7 @@
 1. ✅ Validar e2e y commitear la ola pendiente del frontend (esta sesión).
 2. ✅ Rotar y externalizar secretos + validación de entorno al boot (esta sesión — ver §6).
 3. ✅ Empaquetado de producción: Dockerfile multi-stage backend, Dockerfile+nginx frontend, `docker-compose.prod.yml` (esta sesión — ver §6 y `docs/DESPLIEGUE.md`). TLS queda documentado (terminación en proxy del host o extender nginx).
-4. Usuario de BD no-`sa` con permisos mínimos; forzar cambio de password del admin seed.
+4. ✅ Usuario de BD no-`sa` (`busride_app`) + cambio forzado de password del admin seed (esta sesión — ver §6).
 5. Endurecimiento runtime: helmet, CORS estricto (fallar si falta `CORS_ORIGIN` en prod), Swagger gateado, logging estructurado + filtro global de excepciones.
 6. Migración baseline de TypeORM + documentar evolución de esquema/SPs.
 7. CI básico: build + lint + tests unitarios (caché limpia de jest) + build frontend; e2e opcional con services.
@@ -122,3 +122,8 @@
   - Guía de despliegue nueva: `docs/DESPLIEGUE.md` (secretos, arranque, TLS, operación, dev vs prod).
   - Hallazgos corregidos durante el smoke test: build del frontend requiere node 24 (npm 10 rechaza peerDeps anidados del lock, @zxing exige node ≥ 24); entry del backend en imagen es `dist/main.js` (sin `test/` en contexto, tsc usa rootDir=src); healthcheck nginx con `127.0.0.1` (localhost → ::1 y nginx escucha IPv4).
   - **Smoke test PASADO** en stack aislado (`-p busride_prod`, :8080): SPA servida, fallback de rutas Angular, login del seed vía nginx, `/salud`, handshake Socket.IO, y los 3 servicios `healthy`. Stack de prueba destruido tras la verificación. 141/141 tests unitarios verdes.
+- **2026-07-01 — Paso 4 (credenciales BD y admin seed) ejecutado**:
+  - **Usuario de BD `busride_app`** con privilegios mínimos (db_datareader + db_datawriter + GRANT EXECUTE, sin DDL) creado por `database/init/05_app_user.sql` (idempotente; re-ejecutar rota/sincroniza la password con `APP_DB_PASSWORD`). Ambos composes y el backend local conectan ahora con `busride_app` — **`sa` ya no se usa en runtime** (solo en el init).
+  - **Cambio forzado de password del admin seed**: columna `usuarios.debe_cambiar_password` (en `02_schema.sql` para BDs nuevas; `06_forzar_cambio_password_admin.sql` parchea BDs existentes y marca al admin solo si conserva el hash publicado). El login devuelve `debeCambiarPassword` y emite el claim `dcp` en el access token; `PasswordCaducadaGuard` (global, tras JwtAuthGuard) bloquea con 403 **en producción** todo salvo `POST /auth/cambiar-password` y logout (`@PermitirPasswordCaducada`). El endpoint valida la password actual, exige nueva ≠ actual (mín. 8), revoca todos los refresh tokens y emite un par nuevo sin el claim.
+  - Frontend: página `/cambiar-password` (authGuard, cualquier rol), redirect automático tras login si el flag está activo, y `AuthService.cambiarPassword` que persiste el par de tokens nuevo. E2E: `global-setup.ts` deja al admin seed operativo con la credencial documentada (cambio ida y vuelta) antes de los specs.
+  - Verificado: flujo manual completo contra el backend real (flag → cambio → restauración → flag limpio), **149/149 tests unitarios** (8 nuevos: `cambiarPassword` + `PasswordCaducadaGuard`), build/lint/tsc limpios en ambos lados y **5/5 e2e verdes con el usuario `busride_app`**.

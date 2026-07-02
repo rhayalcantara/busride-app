@@ -34,6 +34,11 @@ export class Usuario {
   @Column({ default: false })
   verificado: boolean;
 
+  // true = credencial provisional (p. ej. el admin seed): debe cambiarla antes
+  // de operar. En producción PasswordCaducadaGuard bloquea el resto del API.
+  @Column({ name: 'debe_cambiar_password', default: false })
+  debeCambiarPassword: boolean;
+
   @Column({ name: 'token_verificacion', length: 100, nullable: true })
   tokenVerificacion: string;
 

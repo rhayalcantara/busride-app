@@ -7,7 +7,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { getDatabaseConfig } from './config/database.config';
 import { validarEntorno } from './config/env.validation';
-import { RolesGuard, ThrottlerHttpGuard } from './common';
+import { PasswordCaducadaGuard, RolesGuard, ThrottlerHttpGuard } from './common';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 
 // Entidades
@@ -106,6 +106,10 @@ import { LiquidacionModule }  from './modules/liquidaciones/liquidacion.module';
     // Los @UseGuards(JwtAuthGuard) que quedan en controladores son redundantes e inocuos.
     { provide: APP_GUARD, useClass: ThrottlerHttpGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    //   2.5 PasswordCaducadaGuard — tras autenticar: si el token trae el claim
+    //       dcp (credencial provisional, p. ej. admin seed) bloquea en producción
+    //       todo salvo @PermitirPasswordCaducada() (cambiar-password, logout).
+    { provide: APP_GUARD, useClass: PasswordCaducadaGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })

@@ -5,9 +5,11 @@ import { environment } from '../../../environments/environment';
 import { TokenStorage } from './token-storage.service';
 import {
   Credenciales,
+  DatosCambioPassword,
   DatosRegistro,
   ParTokens,
   PayloadJwt,
+  RespuestaCambioPassword,
   RespuestaLogin,
   RespuestaRegistro,
   Rol,
@@ -65,6 +67,27 @@ export class AuthService {
       apellido: datos.apellido,
     };
     return this.http.post<RespuestaRegistro>(`${environment.apiUrl}/auth/registrar`, cuerpo);
+  }
+
+  /**
+   * POST /auth/cambiar-password — cambia la contraseña del usuario autenticado.
+   * El backend revoca TODOS los refresh tokens previos y devuelve un par
+   * NUEVO: se persisten los dos tokens y se limpia `debeCambiarPassword`
+   * en el usuario en memoria (el cambio obligatorio queda satisfecho).
+   */
+  cambiarPassword(passwordActual: string, passwordNueva: string): Observable<RespuestaCambioPassword> {
+    const cuerpo: DatosCambioPassword = { passwordActual, passwordNueva };
+    return this.http
+      .post<RespuestaCambioPassword>(`${environment.apiUrl}/auth/cambiar-password`, cuerpo)
+      .pipe(
+        tap((respuesta) => {
+          this.tokenStorage.guardarTokens(respuesta);
+          const actual = this.usuarioSignal();
+          if (actual) {
+            this.usuarioSignal.set({ ...actual, debeCambiarPassword: false });
+          }
+        }),
+      );
   }
 
   /**
@@ -186,6 +209,9 @@ export class AuthService {
       rol: payload.rol,
       nombre: mismoUsuario ? actual.nombre : '',
       apellido: mismoUsuario ? actual.apellido : '',
+      // El flag de cambio obligatorio solo viaja en /auth/login: conservarlo
+      // si ya lo conocíamos para este mismo usuario.
+      debeCambiarPassword: mismoUsuario ? actual.debeCambiarPassword : undefined,
     };
   }
 

@@ -15,6 +15,9 @@ const PUERTO = 4310;
 
 export default defineConfig({
   testDir: './e2e',
+  // Deja al admin seed con la credencial documentada y SIN cambio de
+  // contraseña pendiente antes de correr los specs (ver e2e/global-setup.ts).
+  globalSetup: './e2e/global-setup.ts',
   fullyParallel: false,
   workers: 1,
   retries: 0,

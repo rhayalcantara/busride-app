@@ -15,8 +15,9 @@
 set -euo pipefail
 
 DB_HOST="${DB_HOST:-localhost}"
-# Sin fallback: el secreto viene del entorno (compose lo interpola desde .env)
+# Sin fallback: los secretos vienen del entorno (compose los interpola desde .env)
 SA_PASSWORD="${SA_PASSWORD:?SA_PASSWORD es requerido (compose lo toma de busride-app/.env)}"
+APP_DB_PASSWORD="${APP_DB_PASSWORD:?APP_DB_PASSWORD es requerido (password del login busride_app; compose lo toma de busride-app/.env)}"
 SCRIPTS_DIR="${SCRIPTS_DIR:-/docker-entrypoint-initdb.d}"
 
 # La imagen mssql/server:2022 trae mssql-tools18 (exige -C por TLS autofirmado);
@@ -70,5 +71,14 @@ echo ">> 03_stored_procedures.sql"
 # 04 — admin inicial (idempotente: IF NOT EXISTS por email)
 echo ">> 04_seed_admin.sql"
 "${SQLCMD[@]}" -i "$SCRIPTS_DIR/04_seed_admin.sql"
+
+# 05 — usuario de aplicación busride_app (idempotente; sincroniza la password
+#      con APP_DB_PASSWORD, así el mismo script sirve para rotarla)
+echo ">> 05_app_user.sql"
+"${SQLCMD[@]}" -v APP_DB_PASSWORD="$APP_DB_PASSWORD" -i "$SCRIPTS_DIR/05_app_user.sql"
+
+# 06 — parche debe_cambiar_password + marca del admin seed (idempotente)
+echo ">> 06_forzar_cambio_password_admin.sql"
+"${SQLCMD[@]}" -i "$SCRIPTS_DIR/06_forzar_cambio_password_admin.sql"
 
 echo "Inicialización de busride_db completada."
