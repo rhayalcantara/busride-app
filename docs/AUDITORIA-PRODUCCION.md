@@ -95,7 +95,7 @@
 2. ✅ Rotar y externalizar secretos + validación de entorno al boot (esta sesión — ver §6).
 3. ✅ Empaquetado de producción: Dockerfile multi-stage backend, Dockerfile+nginx frontend, `docker-compose.prod.yml` (esta sesión — ver §6 y `docs/DESPLIEGUE.md`). TLS queda documentado (terminación en proxy del host o extender nginx).
 4. ✅ Usuario de BD no-`sa` (`busride_app`) + cambio forzado de password del admin seed (esta sesión — ver §6).
-5. Endurecimiento runtime: helmet, CORS estricto (fallar si falta `CORS_ORIGIN` en prod), Swagger gateado, logging estructurado + filtro global de excepciones.
+5. ✅ Endurecimiento runtime: helmet, CORS estricto (fallar si falta `CORS_ORIGIN` en prod), Swagger gateado, logging estructurado + filtro global de excepciones (2026-07-02 — ver §6). Incluyó también cifrado de BD configurable (riesgo backend #3) y `logging` del CLI no fijo (riesgo #6).
 6. Migración baseline de TypeORM + documentar evolución de esquema/SPs.
 7. CI básico: build + lint + tests unitarios (caché limpia de jest) + build frontend; e2e opcional con services.
 8. Decidir el destino de Redis (cablear o eliminar).
@@ -127,3 +127,12 @@
   - **Cambio forzado de password del admin seed**: columna `usuarios.debe_cambiar_password` (en `02_schema.sql` para BDs nuevas; `06_forzar_cambio_password_admin.sql` parchea BDs existentes y marca al admin solo si conserva el hash publicado). El login devuelve `debeCambiarPassword` y emite el claim `dcp` en el access token; `PasswordCaducadaGuard` (global, tras JwtAuthGuard) bloquea con 403 **en producción** todo salvo `POST /auth/cambiar-password` y logout (`@PermitirPasswordCaducada`). El endpoint valida la password actual, exige nueva ≠ actual (mín. 8), revoca todos los refresh tokens y emite un par nuevo sin el claim.
   - Frontend: página `/cambiar-password` (authGuard, cualquier rol), redirect automático tras login si el flag está activo, y `AuthService.cambiarPassword` que persiste el par de tokens nuevo. E2E: `global-setup.ts` deja al admin seed operativo con la credencial documentada (cambio ida y vuelta) antes de los specs.
   - Verificado: flujo manual completo contra el backend real (flag → cambio → restauración → flag limpio), **149/149 tests unitarios** (8 nuevos: `cambiarPassword` + `PasswordCaducadaGuard`), build/lint/tsc limpios en ambos lados y **5/5 e2e verdes con el usuario `busride_app`**.
+- **2026-07-02 — Paso 5 (endurecimiento runtime) ejecutado** (iniciado el día anterior; interrumpido por un reinicio de la máquina y retomado/verificado en esta sesión):
+  - **helmet + compression** en `main.ts`. La CSP por defecto de helmet rompe el UI de Swagger (scripts inline), así que se relaja solo fuera de producción; en producción va la CSP completa.
+  - **CORS estricto**: `CORS_ORIGIN` admite lista separada por comas; se eliminó el fallback `'*'`. En producción la validación de entorno ya exige la variable; en desarrollo sin variable queda abierto (se usa el proxy de ng serve).
+  - **Swagger gateado**: apagado con `NODE_ENV=production` salvo opt-in explícito `SWAGGER_HABILITADO=true`.
+  - **`HttpExceptionFilter` global** (`common/filters/`): loguea todo 5xx con método/ruta/stack (antes se perdía), responde 500 genérico sin detalles internos para errores no controlados, y **preserva exactamente el shape de error por defecto de Nest** del que dependen el frontend y los e2e. Re-lanza en contextos WS. 4 tests unitarios.
+  - **`LoggingInterceptor` global** (`common/interceptors/`): log por request de método, ruta, status y duración.
+  - **Cifrado de conexión a BD configurable** (`DB_ENCRYPT` / `DB_TRUST_SERVER_CERTIFICATE`, riesgo backend #3) en ambos datasources, con defaults para la red interna de Docker; `data-source.ts` además: `logging` solo en development (riesgo #6) y default de usuario `busride_app` alineado con `database.config.ts`.
+  - Los `console.log` del bootstrap reemplazados por `Logger`; `.env.example` documenta las variables nuevas.
+  - **Verificado**: build + lint limpios, **153/153 tests unitarios** (14 suites, caché limpia de jest) y smoke test contra el stack real (SQL Server en Docker + backend local en :3002): cabeceras de helmet presentes, CORS permite el origen configurado y bloquea orígenes ajenos, Swagger 200 en dev, login del seed OK y log `[HTTP] POST /api/v1/auth/login 200` visible.

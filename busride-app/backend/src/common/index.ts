@@ -6,3 +6,5 @@ export * from './guards/roles.guard';
 export * from './guards/password-caducada.guard';
 export * from './guards/throttler-http.guard';
 export * from './guards/ws-jwt.guard';
+export * from './filters/http-exception.filter';
+export * from './interceptors/logging.interceptor';

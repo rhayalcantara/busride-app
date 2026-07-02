@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -7,7 +7,13 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { getDatabaseConfig } from './config/database.config';
 import { validarEntorno } from './config/env.validation';
-import { PasswordCaducadaGuard, RolesGuard, ThrottlerHttpGuard } from './common';
+import {
+  HttpExceptionFilter,
+  LoggingInterceptor,
+  PasswordCaducadaGuard,
+  RolesGuard,
+  ThrottlerHttpGuard,
+} from './common';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 
 // Entidades
@@ -111,6 +117,10 @@ import { LiquidacionModule }  from './modules/liquidaciones/liquidacion.module';
     //       todo salvo @PermitirPasswordCaducada() (cambiar-password, logout).
     { provide: APP_GUARD, useClass: PasswordCaducadaGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    // Observabilidad (auditoría, paso 5): log de requests + 5xx con stack.
+    // El filtro preserva el shape de error por defecto de Nest.
+    { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+    { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],
 })
 export class AppModule {}
