@@ -45,17 +45,6 @@ services:
     networks:
       - busride_net
 
-  redis:
-    image: redis:7-alpine
-    container_name: busride_redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - busride_net
-    command: redis-server --appendonly yes
-
   backend:
     build:
       context: ./backend
@@ -72,8 +61,6 @@ services:
       # Usuario de aplicación con privilegios mínimos (lo crea 05_app_user.sql)
       DB_USER: busride_app
       DB_PASSWORD: ${APP_DB_PASSWORD:?Define APP_DB_PASSWORD en busride-app/.env (ver .env.example)}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en busride-app/.env (ver .env.example)}
       JWT_EXPIRES_IN: "24h"
       PORT: 3000
@@ -84,8 +71,6 @@ services:
         condition: service_healthy
       sqlserver-init:
         condition: service_completed_successfully
-      redis:
-        condition: service_started
     networks:
       - busride_net
     volumes:
@@ -94,7 +79,6 @@ services:
 
 volumes:
   sqlserver_data:
-  redis_data:
 
 networks:
   busride_net:

@@ -8,7 +8,7 @@ The git root is `C:\BusRides\busride-app`. The actual project lives one level de
 
 - `busride-app/backend/` — NestJS 10 API (all application code; run `npm` commands from here)
 - `busride-app/database/init/` — SQL Server schema + stored procedures, run on container init
-- `busride-app/docker-compose.yml` — SQL Server 2022, Redis 7, and the backend
+- `busride-app/docker-compose.yml` — SQL Server 2022 and the backend (Redis was removed 2026-07-02: nothing used it)
 
 BusRide is a bus-routing and boarding platform (Spanish-language domain: rutas, paradas, viajes, reservas, abordajes, liquidaciones). Code identifiers, comments, and API messages are in Spanish — match that convention.
 

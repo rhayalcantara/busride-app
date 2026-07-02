@@ -3,7 +3,8 @@
 **Fecha:** 2026-07-01
 **Alcance:** backend (NestJS), frontend (Angular), infraestructura (Docker/BD/despliegue)
 **Método:** 3 auditorías paralelas — build/tests/lint ejecutados + revisión de configuración y seguridad
-**Veredicto:** ❌ **NO listo para producción.** El código está sano; faltan la capa de despliegue y el endurecimiento operativo.
+**Veredicto original (2026-07-01):** ❌ **NO listo para producción.** El código está sano; faltan la capa de despliegue y el endurecimiento operativo.
+**Actualización (2026-07-02):** ✅ **Los 8 pasos del plan de remediación (§5) están completados** — ver el registro de acciones en §6. Deuda restante: TLS (documentado, fuera del compose) y e2e fuera del CI.
 
 ---
 
@@ -98,7 +99,7 @@
 5. ✅ Endurecimiento runtime: helmet, CORS estricto (fallar si falta `CORS_ORIGIN` en prod), Swagger gateado, logging estructurado + filtro global de excepciones (2026-07-02 — ver §6). Incluyó también cifrado de BD configurable (riesgo backend #3) y `logging` del CLI no fijo (riesgo #6).
 6. ✅ Migración baseline de TypeORM + documentar evolución de esquema/SPs (2026-07-02 — ver §6 y `docs/MIGRACIONES.md`).
 7. ✅ CI básico: build + lint + tests unitarios (caché limpia de jest) + build frontend (2026-07-02 — ver §6). E2e quedan locales (requieren BD inicializada); documentado en el workflow.
-8. Decidir el destino de Redis (cablear o eliminar).
+8. ✅ Decidir el destino de Redis: **eliminado** (2026-07-02 — ver §6).
 
 ---
 
@@ -144,3 +145,9 @@
   - `.github/workflows/ci.yml`: 2 jobs paralelos en node 24 con caché de npm. **Backend**: `npm ci` + build + eslint sin `--fix` (`--max-warnings 0`) + `jest --ci` (runner fresco = caché limpia, lección de §2). **Frontend**: `npm ci` + `tsc --noEmit` + lint + unit tests en ChromeHeadless + build de producción. Push a main y PRs; `concurrency` cancela corridas superadas.
   - E2e (jest e2e backend y Playwright) fuera del CI a propósito: requieren SQL Server inicializado con `database/init`; siguen siendo verificación local (documentado en el propio workflow).
   - **Verificado en local cada comando del workflow**: eslint exit 0, `tsc --noEmit` exit 0, **22/22 unit tests del frontend en ChromeHeadless**, YAML válido (yaml-lint); build/lint/jest del backend ya verificados en los pasos 5-6. La primera corrida real será al hacer push a GitHub.
+- **2026-07-02 — Paso 8 (Redis) ejecutado — decisión: eliminar**:
+  - Razones: cero referencias en `backend/src`, sin cliente en `package.json`, el compose de producción ya lo omitía, y corría sin contraseña con el puerto 6379 publicado al host (superficie de ataque gratuita). Los casos de uso candidatos (storage del throttler, caché de posiciones GPS, adapter de socket.io) solo se vuelven necesarios con múltiples réplicas del backend — recablear entonces.
+  - Retirado del `docker-compose.yml` de dev (servicio, `REDIS_HOST/PORT` del backend, `depends_on` y volumen `redis_data`); limpiados `backend/.env.example`, README, CLAUDE.md y `docs/DESPLIEGUE.md`; F13 del `docs/PLAN.md` marcado resuelto por eliminación. Contenedor `busride_redis` y volumen `busride-app_redis_data` (vacío: nada se conectó jamás) eliminados del host.
+  - **Verificado**: `docker compose config` exit 0 tras la edición.
+
+**Con esto, los 8 pasos del plan de remediación (§5) quedan completados.** Deuda conocida restante: TLS gestionado fuera del compose (documentado en `docs/DESPLIEGUE.md` §5), e2e fuera del CI (locales), y la primera corrida real del workflow pendiente del próximo push.

@@ -63,5 +63,5 @@ El stack sirve HTTP plano en `frontend:${FRONTEND_PORT}`. Opciones:
 | Backend | `start:dev` + bind mount de `src` (target `development`) | imagen compilada, no-root, `node dist` (target `production`) |
 | Frontend | `ng serve` local (proxy.conf) | nginx + bundle de producción |
 | SQL Server | puerto 1433 publicado | solo red interna |
-| Redis | levantado (sin uso en el código) | omitido |
+| Redis | eliminado (2026-07-02, auditoría §5 paso 8: el código nunca lo usó) | omitido |
 | NODE_ENV | development | production (activa validaciones estrictas) |

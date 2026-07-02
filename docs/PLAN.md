@@ -37,8 +37,8 @@
 | F10 | Wallet sin idempotencia | Media | `comprarPaquete` no valida que exista la wallet ni deduplica por `referencia_externa` (doble cobro posible). | ✅ Resuelto (T-10 + índice único filtrado en BD, T-12) |
 | F11 | Sin tests | Alta | 0 archivos `.spec.ts`; no hay `jest.config`; `npm test` no funciona. | ✅ Resuelto (Ola 5/6: 120 unit + 47 e2e, 0 skip) |
 | F12 | Sin config ESLint | Media | El script `lint` referencia ESLint pero no hay config ni dependencias instaladas. | ✅ Resuelto (T-01) |
-| F13 | Redis sin usar | Baja | Levantado en docker-compose pero ningún código lo usa (candidato: posiciones GPS, rate limit, sesiones WS). | ⬜ Pendiente (fuera de alcance; fase futura) |
-| F14 | Sin migraciones | Baja | Carpeta `src/database/migrations` no existe; el esquema solo vive en los `.sql` de init. | ⬜ Pendiente (fuera de alcance; el schema vive en `database/init` + `init.sh` idempotente) |
+| F13 | Redis sin usar | Baja | Levantado en docker-compose pero ningún código lo usa (candidato: posiciones GPS, rate limit, sesiones WS). | ✅ Resuelto por eliminación (2026-07-02, auditoría paso 8: se retiró del compose; recablear si algún día hay múltiples réplicas) |
+| F14 | Sin migraciones | Baja | Carpeta `src/database/migrations` no existe; el esquema solo vive en los `.sql` de init. | ✅ Resuelto (2026-07-02, auditoría paso 6: baseline + proceso en `docs/MIGRACIONES.md`) |
 | F15 | Sin README | Baja | No hay documentación de arranque para desarrolladores. | ✅ Resuelto (README.md en la raíz, T-16) |
 | F16 | Acceso interno frágil | Baja | `viajes.controller.ts` usa `this.viajesService['dataSource']` (acceso a privado por índice). | ✅ Resuelto (T-11) |
 | F17 | CRUD de operación faltante | Media | No hay endpoints para gestionar buses, horarios ni asignaciones bus-ruta (necesarios para que `iniciarViaje` tenga datos). | ✅ Resuelto (módulo flota, T-08; endurecido en B6, Ola 6) |

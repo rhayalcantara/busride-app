@@ -7,7 +7,6 @@ Plataforma de rutas y abordaje de autobuses (República Dominicana): pasajeros b
 - **Backend**: NestJS 10 (TypeScript), API REST bajo `/api/v1`, Swagger en `/api/docs`
 - **Base de datos**: SQL Server 2022 — el núcleo transaccional y geoespacial vive en **stored procedures** y columnas `geography` (no en TypeScript)
 - **Tiempo real**: Socket.IO (namespace `/tracking`)
-- **Redis 7**: levantado en docker-compose, previsto para caché/posiciones GPS (aún sin uso en código)
 
 El proyecto vive en `busride-app/`: `backend/` (API), `database/init/` (schema + SPs + seeds), `docker-compose.yml`.
 
@@ -18,7 +17,7 @@ cd busride-app
 docker compose up
 ```
 
-Servicios: `sqlserver` (SQL Server 2022), `sqlserver-init`, `redis` y `backend` (puerto 3000).
+Servicios: `sqlserver` (SQL Server 2022), `sqlserver-init` y `backend` (puerto 3000).
 
 > **`sqlserver-init`**: la imagen oficial de mssql NO ejecuta los scripts de `/docker-entrypoint-initdb.d`. Este servicio one-shot espera a que `sqlserver` esté healthy y ejecuta `database/init.sh` (01 crear BD → 02 schema → 03 stored procedures → 04 seed admin), de forma idempotente. El `backend` no arranca hasta que termina con éxito.
 
