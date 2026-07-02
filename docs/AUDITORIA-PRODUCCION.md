@@ -92,7 +92,7 @@
 ## 5. Plan de remediación sugerido (en orden)
 
 1. ✅ Validar e2e y commitear la ola pendiente del frontend (esta sesión).
-2. Rotar y externalizar secretos (`env_file`, variables de entorno del host, o secret manager) + validación Joi al boot.
+2. ✅ Rotar y externalizar secretos + validación de entorno al boot (esta sesión — ver §6).
 3. Empaquetado de producción: Dockerfile multi-stage backend, Dockerfile+nginx frontend (proxy `/api/v1` + `/socket.io` con upgrade WS, TLS), `docker-compose.prod.yml` (`NODE_ENV=production`, sin puertos DB/Redis publicados, restart policies, healthchecks).
 4. Usuario de BD no-`sa` con permisos mínimos; forzar cambio de password del admin seed.
 5. Endurecimiento runtime: helmet, CORS estricto (fallar si falta `CORS_ORIGIN` en prod), Swagger gateado, logging estructurado + filtro global de excepciones.
@@ -107,3 +107,10 @@
 - **2026-07-01**: Auditoría ejecutada (3 agentes paralelos: backend, frontend, infra). Este documento es el registro.
 - **2026-07-01**: Suite e2e de Playwright ejecutada contra el stack real (SQL Server en Docker + backend local en :3002): **5/5 tests verdes**. Dos ajustes durante la corrida: puerto del `ng serve` de e2e 4300 → 4310 (conflicto con un dev server ajeno en el host) y regex del countdown en `pasajero.spec.ts` (el texto renderizado lleva espacios y `toHaveText` con RegExp no normaliza).
 - **2026-07-01**: Ola pendiente del frontend commiteada (refactor + suite e2e; ver historial de git).
+- **2026-07-01 — Paso 2 (secretos) ejecutado**:
+  - `SA_PASSWORD` rotada en caliente (`ALTER LOGIN sa`) y `JWT_SECRET` regenerado (`openssl rand -hex 32`). Los valores antiguos del historial de git quedan inservibles.
+  - `docker-compose.yml` ya no contiene secretos: interpola `${SA_PASSWORD:?}` / `${JWT_SECRET:?}` desde `busride-app/.env` (ignorado por git; plantilla nueva `busride-app/.env.example`) y falla con mensaje claro si faltan. Healthcheck usa `$$SA_PASSWORD`. Eliminado el `version:` obsoleto.
+  - `database/init.sh` sin fallback hardcodeado de password; `backend/.env.example` sin la password real.
+  - **Validación fail-fast al boot** (`backend/src/config/env.validation.ts`, cableada en `ConfigModule.forRoot({ validate })`): exige `DB_PASSWORD`, `JWT_SECRET` ≥ 32 chars (y rechaza secretos de desarrollo conocidos en producción), `CORS_ORIGIN` concreto (≠ `*`) en producción y variables numéricas válidas. 7 tests unitarios nuevos (141/141 verdes).
+  - Verificado: build + lint limpios, compose OK con `.env` y error explícito sin él, backend reiniciado con secretos nuevos y login del seed admin funcional.
+  - _Pendiente relacionado (pasos 3-4): usuario de BD no-`sa`, password del admin seed, TLS._

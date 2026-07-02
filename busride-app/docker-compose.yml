@@ -1,11 +1,10 @@
-version: '3.8'
-
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: busride_sqlserver
     environment:
-      SA_PASSWORD: "BusRide@2024Secure!"
+      # Secretos interpolados desde ./.env (ver .env.example); :? falla si faltan
+      SA_PASSWORD: ${SA_PASSWORD:?Define SA_PASSWORD en busride-app/.env (ver .env.example)}
       ACCEPT_EULA: "Y"
       MSSQL_PID: "Developer"
     ports:
@@ -16,8 +15,9 @@ services:
     networks:
       - busride_net
     healthcheck:
-      # La imagen 2022-latest trae mssql-tools18 (no mssql-tools); -C confía en el certificado autofirmado
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'BusRide@2024Secure!' -Q 'SELECT 1' || exit 1"]
+      # La imagen 2022-latest trae mssql-tools18 (no mssql-tools); -C confía en el certificado autofirmado.
+      # $$SA_PASSWORD: doble $ para que compose no interpole y lo resuelva el shell del contenedor.
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 10
@@ -35,7 +35,7 @@ services:
         condition: service_healthy
     environment:
       DB_HOST: sqlserver
-      SA_PASSWORD: "BusRide@2024Secure!"
+      SA_PASSWORD: ${SA_PASSWORD:?Define SA_PASSWORD en busride-app/.env (ver .env.example)}
     volumes:
       - ./database/init:/docker-entrypoint-initdb.d:ro
       - ./database/init.sh:/usr/local/bin/busride-init.sh:ro
@@ -66,10 +66,10 @@ services:
       DB_PORT: 1433
       DB_NAME: busride_db
       DB_USER: sa
-      DB_PASSWORD: "BusRide@2024Secure!"
+      DB_PASSWORD: ${SA_PASSWORD:?Define SA_PASSWORD en busride-app/.env (ver .env.example)}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET: "busride-jwt-secret-change-in-production"
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en busride-app/.env (ver .env.example)}
       JWT_EXPIRES_IN: "24h"
       PORT: 3000
     ports:

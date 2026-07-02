@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { getDatabaseConfig } from './config/database.config';
+import { validarEntorno } from './config/env.validation';
 import { RolesGuard, ThrottlerHttpGuard } from './common';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 
@@ -44,7 +45,8 @@ import { LiquidacionModule }  from './modules/liquidaciones/liquidacion.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    // validate: fail-fast al arrancar si faltan secretos o hay valores inválidos
+    ConfigModule.forRoot({ isGlobal: true, validate: validarEntorno }),
 
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],

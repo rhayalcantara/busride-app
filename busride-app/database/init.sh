@@ -15,7 +15,8 @@
 set -euo pipefail
 
 DB_HOST="${DB_HOST:-localhost}"
-SA_PASSWORD="${SA_PASSWORD:-BusRide@2024Secure!}"
+# Sin fallback: el secreto viene del entorno (compose lo interpola desde .env)
+SA_PASSWORD="${SA_PASSWORD:?SA_PASSWORD es requerido (compose lo toma de busride-app/.env)}"
 SCRIPTS_DIR="${SCRIPTS_DIR:-/docker-entrypoint-initdb.d}"
 
 # La imagen mssql/server:2022 trae mssql-tools18 (exige -C por TLS autofirmado);
