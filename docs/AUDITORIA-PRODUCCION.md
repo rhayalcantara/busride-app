@@ -96,7 +96,7 @@
 3. ✅ Empaquetado de producción: Dockerfile multi-stage backend, Dockerfile+nginx frontend, `docker-compose.prod.yml` (esta sesión — ver §6 y `docs/DESPLIEGUE.md`). TLS queda documentado (terminación en proxy del host o extender nginx).
 4. ✅ Usuario de BD no-`sa` (`busride_app`) + cambio forzado de password del admin seed (esta sesión — ver §6).
 5. ✅ Endurecimiento runtime: helmet, CORS estricto (fallar si falta `CORS_ORIGIN` en prod), Swagger gateado, logging estructurado + filtro global de excepciones (2026-07-02 — ver §6). Incluyó también cifrado de BD configurable (riesgo backend #3) y `logging` del CLI no fijo (riesgo #6).
-6. Migración baseline de TypeORM + documentar evolución de esquema/SPs.
+6. ✅ Migración baseline de TypeORM + documentar evolución de esquema/SPs (2026-07-02 — ver §6 y `docs/MIGRACIONES.md`).
 7. CI básico: build + lint + tests unitarios (caché limpia de jest) + build frontend; e2e opcional con services.
 8. Decidir el destino de Redis (cablear o eliminar).
 
@@ -136,3 +136,7 @@
   - **Cifrado de conexión a BD configurable** (`DB_ENCRYPT` / `DB_TRUST_SERVER_CERTIFICATE`, riesgo backend #3) en ambos datasources, con defaults para la red interna de Docker; `data-source.ts` además: `logging` solo en development (riesgo #6) y default de usuario `busride_app` alineado con `database.config.ts`.
   - Los `console.log` del bootstrap reemplazados por `Logger`; `.env.example` documenta las variables nuevas.
   - **Verificado**: build + lint limpios, **153/153 tests unitarios** (14 suites, caché limpia de jest) y smoke test contra el stack real (SQL Server en Docker + backend local en :3002): cabeceras de helmet presentes, CORS permite el origen configurado y bloquea orígenes ajenos, Swagger 200 en dev, login del seed OK y log `[HTTP] POST /api/v1/auth/login 200` visible.
+- **2026-07-02 — Paso 6 (migraciones) ejecutado**:
+  - `src/database/migrations/1782994699481-Baseline.ts`: no crea nada — verifica que el esquema de `database/init/` exista (falla con mensaje claro si no) y registra el punto de partida en la tabla `migrations`. `down()` lanza (no reversible).
+  - Modelo documentado en **`docs/MIGRACIONES.md`**: init scripts poseen la BD desde cero; los cambios sobre BDs vivas van en migraciones de SQL crudo Y en el init correspondiente; `migration:generate` prohibido (las entidades no mapean `geography` → DDL destructivo). Script `migration:create` añadido a package.json; CLAUDE.md actualizado.
+  - **Verificado contra la BD real**: `migration:run` con `busride_app` falla con `CREATE TABLE permission denied` (mínimo privilegio, por diseño → las migraciones se corren con credenciales elevadas en despliegue); con `sa` aplica el baseline (fila en `migrations`) y una segunda corrida responde "No migrations are pending".

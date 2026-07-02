@@ -21,8 +21,8 @@ All run from `busride-app/backend/`:
 - `npm run lint` — ESLint with `--fix`
 - `npx jest` — unit tests; single file: `npx jest reservas.service.spec`
 - `npx jest --config test/jest-e2e.json --runInBand` — e2e tests (require the `busride_sqlserver` container with an initialized DB; they auto-raise `THROTTLE_LIMIT` and close the app in `afterAll`)
-- `npm run migration:generate -- src/database/migrations/<Name>` — generate a TypeORM migration from entity changes
-- `npm run migration:run` / `npm run migration:revert` — apply / undo migrations
+- `npm run migration:create -- src/database/migrations/<Name>` — scaffold an empty migration (write raw SQL; do NOT use `migration:generate`: entities don't map the `geography` columns, so the diff produces destructive DDL)
+- `npm run migration:run` / `npm run migration:revert` — apply / undo migrations. Requires elevated DB credentials (`DB_USER=sa`); the runtime user `busride_app` has no DDL by design. Every schema change goes BOTH in a migration and in `database/init/` — see `docs/MIGRACIONES.md`
 
 Full stack via Docker (from `busride-app/`): `docker compose up`. The mssql image does NOT auto-run `/docker-entrypoint-initdb.d`; the one-shot `sqlserver-init` service runs `database/init.sh` (01 create DB → 02 schema → 03 SPs → 04 seed admin, idempotent) once `sqlserver` is healthy, and `backend` waits for it. Manual re-init: `docker exec -i busride_sqlserver bash < database/init.sh`. Copy `backend/.env.example` to `backend/.env` for local non-Docker runs. Seeded initial admin: `admin@busride.do` / `Admin123!cambiar` (change in production).
 
