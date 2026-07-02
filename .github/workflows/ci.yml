@@ -1,0 +1,56 @@
+# CI básico (auditoría de producción, paso 7): build + lint + tests unitarios
+# del backend y build prod + lint + tests unitarios del frontend.
+# Los e2e (jest e2e del backend, Playwright del frontend) quedan fuera: ambos
+# requieren SQL Server inicializado con database/init; correrlos localmente
+# según docs/VERIFICACION.md y docs/VERIFICACION-FRONTEND.md.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (build + lint + unit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: busride-app/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: busride-app/backend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      # Sin --fix (el script local lo lleva): en CI el lint solo verifica
+      - run: npx eslint "{src,apps,libs,test}/**/*.ts" --max-warnings 0
+      # Runner fresco = caché de jest limpia (lección de la auditoría §2)
+      - run: npx jest --ci
+
+  frontend:
+    name: Frontend (build prod + lint + unit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: busride-app/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # @zxing/browser exige node >= 24 (hallazgo del paso 3 de la auditoría)
+          node-version: 24
+          cache: npm
+          cache-dependency-path: busride-app/frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit -p tsconfig.app.json
+      - run: npm run lint
+      - run: npm test -- --watch=false --browsers=ChromeHeadless
+      - run: npm run build -- --configuration production

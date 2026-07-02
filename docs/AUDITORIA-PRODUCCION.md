@@ -97,7 +97,7 @@
 4. ✅ Usuario de BD no-`sa` (`busride_app`) + cambio forzado de password del admin seed (esta sesión — ver §6).
 5. ✅ Endurecimiento runtime: helmet, CORS estricto (fallar si falta `CORS_ORIGIN` en prod), Swagger gateado, logging estructurado + filtro global de excepciones (2026-07-02 — ver §6). Incluyó también cifrado de BD configurable (riesgo backend #3) y `logging` del CLI no fijo (riesgo #6).
 6. ✅ Migración baseline de TypeORM + documentar evolución de esquema/SPs (2026-07-02 — ver §6 y `docs/MIGRACIONES.md`).
-7. CI básico: build + lint + tests unitarios (caché limpia de jest) + build frontend; e2e opcional con services.
+7. ✅ CI básico: build + lint + tests unitarios (caché limpia de jest) + build frontend (2026-07-02 — ver §6). E2e quedan locales (requieren BD inicializada); documentado en el workflow.
 8. Decidir el destino de Redis (cablear o eliminar).
 
 ---
@@ -140,3 +140,7 @@
   - `src/database/migrations/1782994699481-Baseline.ts`: no crea nada — verifica que el esquema de `database/init/` exista (falla con mensaje claro si no) y registra el punto de partida en la tabla `migrations`. `down()` lanza (no reversible).
   - Modelo documentado en **`docs/MIGRACIONES.md`**: init scripts poseen la BD desde cero; los cambios sobre BDs vivas van en migraciones de SQL crudo Y en el init correspondiente; `migration:generate` prohibido (las entidades no mapean `geography` → DDL destructivo). Script `migration:create` añadido a package.json; CLAUDE.md actualizado.
   - **Verificado contra la BD real**: `migration:run` con `busride_app` falla con `CREATE TABLE permission denied` (mínimo privilegio, por diseño → las migraciones se corren con credenciales elevadas en despliegue); con `sa` aplica el baseline (fila en `migrations`) y una segunda corrida responde "No migrations are pending".
+- **2026-07-02 — Paso 7 (CI) ejecutado**:
+  - `.github/workflows/ci.yml`: 2 jobs paralelos en node 24 con caché de npm. **Backend**: `npm ci` + build + eslint sin `--fix` (`--max-warnings 0`) + `jest --ci` (runner fresco = caché limpia, lección de §2). **Frontend**: `npm ci` + `tsc --noEmit` + lint + unit tests en ChromeHeadless + build de producción. Push a main y PRs; `concurrency` cancela corridas superadas.
+  - E2e (jest e2e backend y Playwright) fuera del CI a propósito: requieren SQL Server inicializado con `database/init`; siguen siendo verificación local (documentado en el propio workflow).
+  - **Verificado en local cada comando del workflow**: eslint exit 0, `tsc --noEmit` exit 0, **22/22 unit tests del frontend en ChromeHeadless**, YAML válido (yaml-lint); build/lint/jest del backend ya verificados en los pasos 5-6. La primera corrida real será al hacer push a GitHub.
