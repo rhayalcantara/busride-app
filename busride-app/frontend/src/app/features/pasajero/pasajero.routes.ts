@@ -20,25 +20,30 @@ export const PASAJERO_ROUTES: Routes = [
       {
         path: '',
         loadComponent: () => import('./buscar/buscar.component').then((m) => m.BuscarComponent),
+        title: 'BusRide — Buscar ruta',
       },
       {
         path: 'reservar',
         loadComponent: () =>
           import('./reservar/reservar.component').then((m) => m.ReservarComponent),
+        title: 'BusRide — Reservar',
       },
       {
         path: 'viaje/:viajeId',
         loadComponent: () =>
           import('./viaje-vivo/viaje-vivo.component').then((m) => m.ViajeVivoComponent),
+        title: 'BusRide — Viaje en vivo',
       },
       {
         path: 'wallet',
         loadComponent: () => import('./wallet/wallet.component').then((m) => m.WalletComponent),
+        title: 'BusRide — Wallet',
       },
       {
         path: 'reservas',
         loadComponent: () =>
           import('./mis-reservas/mis-reservas.component').then((m) => m.MisReservasComponent),
+        title: 'BusRide — Mis reservas',
       },
     ],
   },

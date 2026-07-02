@@ -7,7 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { CrearHorarioDto, FlotaApi, Horario } from '../../../../core/api';
-import { extraerMensajeError } from '../../mensaje-error.util';
+import { extraerMensajeError } from '../../../../shared';
 
 export interface DatosHorarioDialog {
   rutaId: string;

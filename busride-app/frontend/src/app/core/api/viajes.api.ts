@@ -6,6 +6,7 @@ import {
   PasajeroEnParada,
   PosicionActualizada,
   Viaje,
+  ViajeDetalle,
   ViajeFinalizado,
 } from './models/viaje.model';
 
@@ -35,6 +36,12 @@ export class ViajesApi {
   // GET /viajes/mi-activo — viaje EN_CURSO del conductor autenticado (null si no hay)
   obtenerMiActivo(): Observable<Viaje | null> {
     return this.http.get<Viaje | null>(`${this.baseUrl}/mi-activo`);
+  }
+
+  // GET /viajes/:id — detalle (estado, ruta, asientos, última posición) para
+  // cualquier usuario autenticado (F-09a)
+  obtenerDetalle(viajeId: string): Observable<ViajeDetalle> {
+    return this.http.get<ViajeDetalle>(`${this.baseUrl}/${viajeId}`);
   }
 
   // GET /viajes/:id/parada/:paradaId/pasajeros — pasajeros esperando en una parada

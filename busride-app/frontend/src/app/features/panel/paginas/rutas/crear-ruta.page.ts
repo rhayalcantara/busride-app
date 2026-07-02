@@ -9,9 +9,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router, RouterLink } from '@angular/router';
 import { CrearRutaDto, ParadaRutaDto, RutasApi } from '../../../../core/api';
-import { CoordenadaMapa, MapaComponent, MarcadorMapa } from '../../../../shared';
+import { CoordenadaMapa, extraerMensajeError, MapaComponent, MarcadorMapa } from '../../../../shared';
 import { AsociacionContextoService } from '../../asociacion-contexto.service';
-import { extraerMensajeError } from '../../mensaje-error.util';
 import { SelectorAsociacionComponent } from '../../selector-asociacion.component';
 
 /** Parada en edición (el orden lo da la posición en el arreglo). */

@@ -9,11 +9,11 @@ import {
   CeldaTablaDirective,
   ColumnaTabla,
   EstadoVacioComponent,
+  extraerMensajeError,
   FechaCortaPipe,
   TablaPaginadaComponent,
 } from '../../../../shared';
 import { AsociacionContextoService } from '../../asociacion-contexto.service';
-import { extraerMensajeError } from '../../mensaje-error.util';
 import { SelectorAsociacionComponent } from '../../selector-asociacion.component';
 import { CrearConductorDialogComponent } from './crear-conductor-dialog.component';
 

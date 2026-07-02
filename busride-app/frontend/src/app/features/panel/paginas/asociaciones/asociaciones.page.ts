@@ -1,36 +1,33 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Asociacion, AsociacionesApi } from '../../../../core/api';
+import { Asociacion, AsociacionesApi, EstadoAsociacion } from '../../../../core/api';
 import {
   CeldaTablaDirective,
   ColumnaTabla,
   ConfirmDialogComponent,
   EstadoVacioComponent,
   TablaPaginadaComponent,
-  sonUuidsIguales,
+  extraerMensajeError,
 } from '../../../../shared';
 import { AsociacionContextoService } from '../../asociacion-contexto.service';
-import { extraerMensajeError } from '../../mensaje-error.util';
 import { AsociacionDialogComponent } from './asociacion-dialog.component';
 import { VincularAdminDialogComponent } from './vincular-admin-dialog.component';
 
 /**
- * Asociaciones (solo admin): listado, crear/editar, aprobar y vincular
- * usuario administrador.
- *
- * LIMITACIÓN del backend: GET /asociaciones solo devuelve las ACTIVAS, no
- * existe un listado de PENDIENTES/SUSPENDIDAS. Las asociaciones creadas en
- * esta sesión se conservan en memoria para poder aprobarlas; al recargar la
- * página, una asociación PENDIENTE deja de ser visible (fricción reportada).
+ * Asociaciones (solo admin): listado con filtro por estado (F-09a añadió
+ * `GET /asociaciones?estado=`, así que las PENDIENTES sobreviven al reload),
+ * crear/editar, aprobar y vincular usuario administrador.
  */
 @Component({
   selector: 'app-asociaciones-page',
   imports: [
     MatButtonModule,
+    MatButtonToggleModule,
     MatIconModule,
     MatProgressBarModule,
     TablaPaginadaComponent,
@@ -46,10 +43,17 @@ import { VincularAdminDialogComponent } from './vincular-admin-dialog.component'
       </button>
     </header>
 
-    <p class="aviso-limitacion">
-      El backend solo lista asociaciones ACTIVAS: las PENDIENTES creadas en esta sesión se
-      muestran abajo hasta aprobarlas, pero no sobreviven a una recarga.
-    </p>
+    <mat-button-toggle-group
+      class="filtro-estado"
+      aria-label="Filtrar por estado"
+      [value]="estado()"
+      (change)="cambiarEstado($event.value)"
+      hideSingleSelectionIndicator
+    >
+      <mat-button-toggle value="ACTIVA">Activas</mat-button-toggle>
+      <mat-button-toggle value="PENDIENTE">Pendientes</mat-button-toggle>
+      <mat-button-toggle value="SUSPENDIDA">Suspendidas</mat-button-toggle>
+    </mat-button-toggle-group>
 
     @if (cargando()) {
       <mat-progress-bar mode="indeterminate" />
@@ -64,8 +68,8 @@ import { VincularAdminDialogComponent } from './vincular-admin-dialog.component'
       />
     } @else if (lista().length === 0 && !cargando()) {
       <app-estado-vacio
-        mensaje="No hay asociaciones activas registradas."
-        textoAccion="Crear la primera"
+        [mensaje]="'No hay asociaciones en estado ' + estado() + '.'"
+        textoAccion="Crear asociación"
         (accion)="abrirCrear()"
       />
     } @else {
@@ -128,10 +132,8 @@ import { VincularAdminDialogComponent } from './vincular-admin-dialog.component'
       .pagina-encabezado h2 {
         margin: 0;
       }
-      .aviso-limitacion {
-        margin: 0 0 12px;
-        font-size: 13px;
-        color: var(--mat-sys-on-surface-variant, rgba(0, 0, 0, 0.6));
+      .filtro-estado {
+        margin-bottom: 12px;
       }
       .chip {
         padding: 2px 10px;
@@ -161,16 +163,10 @@ export class AsociacionesPageComponent {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
-  protected readonly activas = signal<Asociacion[]>([]);
-  /** PENDIENTES creadas en esta sesión (el backend no las lista). */
-  protected readonly pendientesLocales = signal<Asociacion[]>([]);
+  protected readonly estado = signal<EstadoAsociacion>('ACTIVA');
+  protected readonly lista = signal<Asociacion[]>([]);
   protected readonly cargando = signal(false);
   protected readonly errorCarga = signal<string | null>(null);
-
-  protected readonly lista = computed<Asociacion[]>(() => [
-    ...this.pendientesLocales(),
-    ...this.activas(),
-  ]);
 
   protected readonly columnas: ColumnaTabla<Asociacion>[] = [
     { clave: 'nombre', encabezado: 'Nombre' },
@@ -189,16 +185,17 @@ export class AsociacionesPageComponent {
     this.cargar();
   }
 
+  cambiarEstado(estado: EstadoAsociacion): void {
+    this.estado.set(estado);
+    this.cargar();
+  }
+
   cargar(): void {
     this.cargando.set(true);
     this.errorCarga.set(null);
-    this.asociacionesApi.listarActivas().subscribe({
+    this.asociacionesApi.listar(this.estado()).subscribe({
       next: (lista) => {
-        this.activas.set(lista);
-        // Si una pendiente local ya aparece activa, se quita de la lista local
-        this.pendientesLocales.update((pendientes) =>
-          pendientes.filter((p) => !lista.some((a) => sonUuidsIguales(a.id, p.id))),
-        );
+        this.lista.set(lista);
         this.cargando.set(false);
       },
       error: (error: unknown) => {
@@ -214,12 +211,14 @@ export class AsociacionesPageComponent {
       .afterClosed()
       .subscribe((creada?: Asociacion) => {
         if (creada) {
-          this.pendientesLocales.update((pendientes) => [creada, ...pendientes]);
           this.snackBar.open(
             `Asociación «${creada.nombre}» creada en estado ${creada.estado}`,
             'OK',
             { duration: 4000 },
           );
+          // Las recién creadas nacen PENDIENTE: se salta al filtro que las muestra.
+          this.estado.set('PENDIENTE');
+          this.cargar();
         }
       });
   }
@@ -235,7 +234,6 @@ export class AsociacionesPageComponent {
       .subscribe((actualizada?: Asociacion) => {
         if (actualizada) {
           this.snackBar.open('Asociación actualizada', 'OK', { duration: 4000 });
-          this.reemplazarLocal(actualizada);
           this.cargar();
         }
       });
@@ -274,16 +272,8 @@ export class AsociacionesPageComponent {
       .subscribe((actualizada?: Asociacion) => {
         if (actualizada) {
           this.snackBar.open('Usuario administrador vinculado', 'OK', { duration: 4000 });
-          this.reemplazarLocal(actualizada);
           this.cargar();
         }
       });
-  }
-
-  /** Mantiene coherente la lista local de pendientes tras editar/vincular. */
-  private reemplazarLocal(asociacion: Asociacion): void {
-    this.pendientesLocales.update((pendientes) =>
-      pendientes.map((p) => (sonUuidsIguales(p.id, asociacion.id) ? asociacion : p)),
-    );
   }
 }

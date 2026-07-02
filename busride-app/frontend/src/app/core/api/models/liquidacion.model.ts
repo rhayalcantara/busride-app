@@ -24,6 +24,13 @@ export interface LiquidacionConductor {
   ruta_nombre: string | null;
 }
 
+// Fila cruda de GET /liquidaciones (listado admin, F-09a): columnas de
+// `liquidaciones` + nombre del conductor y datos del viaje/ruta (nullables),
+// orden fecha_creacion DESC. Filtrable con ?estado=.
+export interface LiquidacionAdmin extends LiquidacionConductor {
+  conductor_nombre: string;
+}
+
 // GET /liquidaciones/mias/resumen devuelve UNA fila agregada (el backend la
 // retorna dentro de un arreglo, resultado crudo de dataSource.query).
 export interface ResumenLiquidaciones {

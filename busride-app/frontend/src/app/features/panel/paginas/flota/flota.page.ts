@@ -22,11 +22,11 @@ import {
   ColumnaTabla,
   ConfirmDialogComponent,
   EstadoVacioComponent,
+  extraerMensajeError,
   FechaCortaPipe,
   TablaPaginadaComponent,
 } from '../../../../shared';
 import { AsociacionContextoService } from '../../asociacion-contexto.service';
-import { extraerMensajeError } from '../../mensaje-error.util';
 import { SelectorAsociacionComponent } from '../../selector-asociacion.component';
 import { AsignacionDialogComponent } from './asignacion-dialog.component';
 import { BusDialogComponent } from './bus-dialog.component';

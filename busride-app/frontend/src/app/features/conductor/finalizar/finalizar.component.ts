@@ -9,10 +9,10 @@ import { Viaje, ViajeFinalizado, ViajesApi } from '../../../core/api';
 import {
   ConfirmDialogComponent,
   EstadoVacioComponent,
+  extraerMensajeError,
   FechaCortaPipe,
   MonedaDopPipe,
 } from '../../../shared';
-import { extraerMensajeError } from '../../auth/mensaje-error.util';
 
 /**
  * Finalización del viaje activo: confirmación explícita (confirm-dialog) →

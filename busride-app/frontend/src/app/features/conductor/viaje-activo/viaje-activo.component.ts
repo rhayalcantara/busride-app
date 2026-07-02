@@ -25,12 +25,12 @@ import { TrackingSocketService } from '../../../core/socket';
 import {
   CoordenadaMapa,
   EstadoVacioComponent,
+  extraerMensajeError,
   FechaCortaPipe,
   MapaComponent,
   MarcadorMapa,
   sonUuidsIguales,
 } from '../../../shared';
-import { extraerMensajeError } from '../../auth/mensaje-error.util';
 
 /** Cada cuánto se emite la posición por el socket (throttle del watch). */
 const INTERVALO_SOCKET_MS = 5_000;
@@ -332,7 +332,7 @@ export class ViajeActivoComponent implements OnInit {
           this.miPosicion.set({ lat: viaje.posLat, lng: viaje.posLng });
         }
         this.cargarParadas(viaje.rutaId);
-        this.escucharDisponibilidad(viaje.rutaId);
+        this.escucharDisponibilidad(viaje.id);
         this.iniciarGps(viaje.id);
       },
       error: (err: unknown) => {
@@ -378,14 +378,14 @@ export class ViajeActivoComponent implements OnInit {
     });
   }
 
-  /** Asientos en vivo: evento global filtrado por la ruta de este viaje. */
-  private escucharDisponibilidad(rutaId: string): void {
+  /** Asientos en vivo: evento global (tras cada abordaje) filtrado por este viaje. */
+  private escucharDisponibilidad(viajeId: string): void {
     this.socket
       .escucharDisponibilidad()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((datos) => {
-        if (sonUuidsIguales(datos.rutaId, rutaId)) {
-          this.asientosDisponibles.set(datos.asientosLibres);
+        if (sonUuidsIguales(datos.viajeId, viajeId)) {
+          this.asientosDisponibles.set(datos.asientosDisponibles);
         }
       });
   }

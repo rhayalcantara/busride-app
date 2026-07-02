@@ -3,6 +3,8 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
+  EstadoLiquidacion,
+  LiquidacionAdmin,
   LiquidacionConductor,
   LiquidacionPagadaRespuesta,
   ResumenLiquidaciones,
@@ -13,6 +15,14 @@ import {
 export class LiquidacionesApi {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiUrl}/liquidaciones`;
+
+  // GET /liquidaciones?estado= — listado completo (solo admin, F-09a),
+  // orden fecha_creacion DESC, con conductor_nombre y ruta_nombre del JOIN.
+  listarTodas(estado?: EstadoLiquidacion): Observable<LiquidacionAdmin[]> {
+    let params = new HttpParams();
+    if (estado) params = params.set('estado', estado);
+    return this.http.get<LiquidacionAdmin[]>(this.baseUrl, { params });
+  }
 
   // GET /liquidaciones/mias — historial del conductor autenticado
   listarMias(): Observable<LiquidacionConductor[]> {

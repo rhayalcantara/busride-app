@@ -13,8 +13,8 @@ import {
   Usuario,
   UsuariosApi,
 } from '../../../../core/api';
-import { extraerMensajeError } from '../../mensaje-error.util';
 import { etiquetaUsuario, usuariosActivosConRol } from '../../usuarios-por-rol.util';
+import { extraerMensajeError } from '../../../../shared';
 
 export interface DatosCrearConductorDialog {
   asociacionId: string;

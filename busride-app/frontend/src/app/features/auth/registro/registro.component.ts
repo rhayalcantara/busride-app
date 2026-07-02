@@ -9,7 +9,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../../core/auth';
-import { extraerMensajeError } from '../mensaje-error.util';
+import { extraerMensajeError } from '../../../shared';
 
 /**
  * Registro público de PASAJEROS (el backend no acepta otros roles aquí).

@@ -11,7 +11,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
-import { ParadaConUbicacion, RutasApi } from '../../../core/api';
+import { ParadaConUbicacion, RutasApi, ViajeDetalle, ViajesApi } from '../../../core/api';
 import { PosicionBus, TrackingSocketService } from '../../../core/socket';
 import {
   CoordenadaMapa,
@@ -23,13 +23,22 @@ import {
 
 const CENTRO_DEFECTO: CoordenadaMapa = { lat: 18.4861, lng: -69.9312 };
 
+const ETIQUETA_ESTADO_VIAJE: Record<string, string> = {
+  PROGRAMADO: 'Programado',
+  EN_CURSO: 'En curso',
+  FINALIZADO: 'Finalizado',
+  CANCELADO: 'Cancelado',
+};
+
 /**
- * Viaje en vivo: se suscribe por Socket.IO a la sala del viaje
- * (`suscribir_viaje`) y pinta el bus moviéndose en el mapa con cada
- * `posicion_bus`. Se desuscribe al salir de la página. Si llega `rutaId`
- * por query param, dibuja además las paradas y la polilínea de la ruta.
+ * Viaje en vivo: carga el estado inicial con `GET /viajes/:id` (F-09a:
+ * estado, nombre de ruta y última posición conocida — ya no depende solo de
+ * query params) y luego se suscribe por Socket.IO a la sala del viaje
+ * (`suscribir_viaje`) para pintar el bus moviéndose con cada `posicion_bus`.
+ * Se desuscribe al salir de la página.
  *
- * Ruta: /pasajero/viaje/:viajeId?rutaId=...&rutaNombre=...
+ * Ruta: /pasajero/viaje/:viajeId (query params rutaId/rutaNombre opcionales,
+ * solo como datos preliminares mientras llega el detalle).
  */
 @Component({
   selector: 'app-pasajero-viaje-vivo',
@@ -49,17 +58,21 @@ const CENTRO_DEFECTO: CoordenadaMapa = { lat: 18.4861, lng: -69.9312 };
             @if (posicion(); as pos) {
               <mat-icon class="vivo__icono vivo__icono--activo">directions_bus</mat-icon>
               <div>
-                <p class="vivo__titulo">{{ rutaNombre }}</p>
+                <p class="vivo__titulo">{{ rutaNombre() }}</p>
                 <p class="vivo__detalle">
-                  Bus en movimiento · última posición: {{ pos.timestamp | fechaCorta }}
+                  {{ etiquetaEstado() }} · última posición: {{ pos.timestamp | fechaCorta }}
                 </p>
               </div>
             } @else {
               <mat-icon class="vivo__icono">satellite_alt</mat-icon>
               <div>
-                <p class="vivo__titulo">{{ rutaNombre }}</p>
+                <p class="vivo__titulo">{{ rutaNombre() }}</p>
                 <p class="vivo__detalle">
-                  Esperando la posición del bus… (el conductor la emite cada ~5 s)
+                  @if (viajeFinalizado()) {
+                    Este viaje ya finalizó.
+                  } @else {
+                    Esperando la posición del bus… (el conductor la emite cada ~5 s)
+                  }
                 </p>
               </div>
             }
@@ -137,14 +150,32 @@ export class ViajeVivoComponent {
   private readonly ruta = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly rutasApi = inject(RutasApi);
+  private readonly viajesApi = inject(ViajesApi);
   private readonly tracking = inject(TrackingSocketService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly viajeId: string;
-  protected readonly rutaNombre: string;
 
+  protected readonly detalle = signal<ViajeDetalle | null>(null);
   protected readonly posicion = signal<PosicionBus | null>(null);
   protected readonly paradas = signal<ParadaConUbicacion[]>([]);
+
+  /** Nombre preliminar de la ruta (query param) hasta que llega el detalle. */
+  private readonly nombrePreliminar: string;
+
+  protected readonly rutaNombre = computed(
+    () => this.detalle()?.ruta.nombre ?? this.nombrePreliminar,
+  );
+
+  protected readonly etiquetaEstado = computed(() => {
+    const estado = this.detalle()?.estado;
+    return (estado && ETIQUETA_ESTADO_VIAJE[estado]) || 'Bus en movimiento';
+  });
+
+  protected readonly viajeFinalizado = computed(() => {
+    const estado = this.detalle()?.estado;
+    return estado === 'FINALIZADO' || estado === 'CANCELADO';
+  });
 
   /** El mapa sigue al bus; antes de la primera posición, primera parada o centro por defecto. */
   protected readonly centro = computed<CoordenadaMapa>(() => {
@@ -176,12 +207,34 @@ export class ViajeVivoComponent {
       .map((p) => ({ lat: p.lat, lng: p.lng })),
   );
 
+  /** Ruta cuyas paradas ya se pidieron (evita la doble carga query param + detalle). */
+  private rutaCargadaId: string | null = null;
+
   constructor() {
     this.viajeId = this.ruta.snapshot.paramMap.get('viajeId') ?? '';
-    this.rutaNombre = this.ruta.snapshot.queryParamMap.get('rutaNombre') ?? 'Viaje en vivo';
-    const rutaId = this.ruta.snapshot.queryParamMap.get('rutaId');
+    this.nombrePreliminar = this.ruta.snapshot.queryParamMap.get('rutaNombre') ?? 'Viaje en vivo';
+    const rutaIdPreliminar = this.ruta.snapshot.queryParamMap.get('rutaId');
 
     if (this.viajeId) {
+      // Estado inicial real (estado, ruta, última posición) vía API (F-09a).
+      this.viajesApi.obtenerDetalle(this.viajeId).subscribe({
+        next: (detalle) => {
+          this.detalle.set(detalle);
+          // Última posición conocida: el mapa no queda vacío hasta el primer evento.
+          if (detalle.posicion && this.posicion() === null) {
+            this.posicion.set({
+              viajeId: detalle.id,
+              lat: detalle.posicion.lat,
+              lng: detalle.posicion.lng,
+              timestamp: detalle.posicion.timestamp ?? '',
+            });
+          }
+          this.cargarParadas(detalle.ruta.id);
+        },
+        // Sin detalle la página sigue funcionando con socket + query params.
+        error: () => undefined,
+      });
+
       // Suscripción a la sala del viaje; al destruir la página se abandona.
       this.tracking
         .suscribirViaje(this.viajeId)
@@ -190,12 +243,18 @@ export class ViajeVivoComponent {
       this.destroyRef.onDestroy(() => this.tracking.desuscribirViaje(this.viajeId));
     }
 
-    if (rutaId) {
-      this.rutasApi.obtenerParadas(rutaId).subscribe({
-        next: (paradas) => this.paradas.set(paradas),
-        error: () => undefined, // sin paradas el mapa sigue mostrando el bus
-      });
+    if (rutaIdPreliminar) {
+      this.cargarParadas(rutaIdPreliminar);
     }
+  }
+
+  private cargarParadas(rutaId: string): void {
+    if (this.rutaCargadaId?.toLowerCase() === rutaId.toLowerCase()) return;
+    this.rutaCargadaId = rutaId;
+    this.rutasApi.obtenerParadas(rutaId).subscribe({
+      next: (paradas) => this.paradas.set(paradas),
+      error: () => undefined, // sin paradas el mapa sigue mostrando el bus
+    });
   }
 
   irABuscar(): void {

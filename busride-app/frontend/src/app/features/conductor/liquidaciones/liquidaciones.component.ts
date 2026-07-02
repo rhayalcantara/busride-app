@@ -12,8 +12,7 @@ import {
   ResumenLiquidaciones,
   ResumenLiquidacionesParams,
 } from '../../../core/api';
-import { EstadoVacioComponent, FechaCortaPipe, MonedaDopPipe } from '../../../shared';
-import { extraerMensajeError } from '../../auth/mensaje-error.util';
+import { EstadoVacioComponent, extraerMensajeError, FechaCortaPipe, MonedaDopPipe } from '../../../shared';
 
 const ETIQUETA_ESTADO: Record<LiquidacionConductor['estado'], string> = {
   PENDIENTE: 'Pendiente',

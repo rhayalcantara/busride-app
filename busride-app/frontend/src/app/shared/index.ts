@@ -12,3 +12,4 @@ export * from './pipes/fecha-corta.pipe';
 // Utilidades
 export * from './utils/uuid.util';
 export * from './utils/referencia.util';
+export * from './utils/mensaje-error.util';

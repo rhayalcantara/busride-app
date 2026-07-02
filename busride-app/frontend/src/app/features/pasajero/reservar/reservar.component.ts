@@ -19,8 +19,7 @@ import {
   ReservasApi,
   RutasApi,
 } from '../../../core/api';
-import { EstadoVacioComponent } from '../../../shared';
-import { extraerMensajeError } from '../../auth/mensaje-error.util';
+import { EstadoVacioComponent, extraerMensajeError } from '../../../shared';
 
 /**
  * Reservar asiento: elegir parada de origen y destino entre las paradas de la

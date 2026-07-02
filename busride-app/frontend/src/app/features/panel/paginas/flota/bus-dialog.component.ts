@@ -1,5 +1,10 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormControl,
+  NonNullableFormBuilder,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -7,7 +12,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { ActualizarBusDto, Bus, CrearBusDto, FlotaApi } from '../../../../core/api';
-import { extraerMensajeError } from '../../mensaje-error.util';
+import { extraerMensajeError } from '../../../../shared';
 
 export interface DatosBusDialog {
   asociacionId: string;
@@ -135,7 +140,14 @@ export class BusDialogComponent {
     ],
     marca: [this.datos.bus?.marca ?? ''],
     modelo: [this.datos.bus?.modelo ?? ''],
-    anno: [this.datos.bus?.anno ?? 0, [Validators.min(0), Validators.max(2100)]],
+    // Nullable: vacío = sin año. OJO: los atributos nativos min/max del input
+    // numérico también registran validadores (MinValidator/MaxValidator de
+    // Angular); con el antiguo valor inicial 0 el formulario nacía inválido
+    // («Año» min=1950) y el diálogo nunca enviaba (bug F-08, corregido en F-09).
+    anno: new FormControl<number | null>(this.datos.bus?.anno ?? null, [
+      Validators.min(1950),
+      Validators.max(2100),
+    ]),
     fotoUrl: [this.datos.bus?.fotoUrl ?? ''],
     activo: [this.datos.bus?.activo ?? true],
   });
@@ -154,7 +166,7 @@ export class BusDialogComponent {
       capacidadTotal: valores.capacidadTotal,
       ...(valores.marca.trim() ? { marca: valores.marca.trim() } : {}),
       ...(valores.modelo.trim() ? { modelo: valores.modelo.trim() } : {}),
-      ...(valores.anno >= 1950 ? { anno: valores.anno } : {}),
+      ...(valores.anno !== null && valores.anno >= 1950 ? { anno: valores.anno } : {}),
       ...(valores.fotoUrl.trim() ? { fotoUrl: valores.fotoUrl.trim() } : {}),
     };
 

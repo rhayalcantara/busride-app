@@ -15,21 +15,25 @@ export const CONDUCTOR_ROUTES: Routes = [
         path: '',
         loadComponent: () =>
           import('./inicio/inicio.component').then((m) => m.InicioConductorComponent),
+        title: 'BusRide — Conductor',
       },
       {
         path: 'viaje',
         loadComponent: () =>
           import('./viaje-activo/viaje-activo.component').then((m) => m.ViajeActivoComponent),
+        title: 'BusRide — Viaje activo',
       },
       {
         path: 'abordar',
         loadComponent: () =>
           import('./abordar/abordar.component').then((m) => m.AbordarComponent),
+        title: 'BusRide — Abordar pasajero',
       },
       {
         path: 'finalizar',
         loadComponent: () =>
           import('./finalizar/finalizar.component').then((m) => m.FinalizarViajeComponent),
+        title: 'BusRide — Finalizar viaje',
       },
       {
         path: 'liquidaciones',
@@ -37,6 +41,7 @@ export const CONDUCTOR_ROUTES: Routes = [
           import('./liquidaciones/liquidaciones.component').then(
             (m) => m.LiquidacionesConductorComponent,
           ),
+        title: 'BusRide — Mis liquidaciones',
       },
       { path: '**', redirectTo: '' },
     ],

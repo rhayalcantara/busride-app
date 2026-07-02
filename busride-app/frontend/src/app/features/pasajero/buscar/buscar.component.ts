@@ -12,11 +12,11 @@ import { ParadaConUbicacion, RutaDisponible, RutasApi } from '../../../core/api'
 import {
   CoordenadaMapa,
   EstadoVacioComponent,
+  extraerMensajeError,
   MapaComponent,
   MarcadorMapa,
   MonedaDopPipe,
 } from '../../../shared';
-import { extraerMensajeError } from '../../auth/mensaje-error.util';
 
 // Centro por defecto si el usuario deniega la geolocalización: Santo Domingo.
 const CENTRO_DEFECTO: CoordenadaMapa = { lat: 18.4861, lng: -69.9312 };

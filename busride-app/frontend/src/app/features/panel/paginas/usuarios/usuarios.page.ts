@@ -10,10 +10,10 @@ import {
   ColumnaTabla,
   ConfirmDialogComponent,
   EstadoVacioComponent,
+  extraerMensajeError,
   FechaCortaPipe,
   TablaPaginadaComponent,
 } from '../../../../shared';
-import { extraerMensajeError } from '../../mensaje-error.util';
 import { CrearUsuarioDialogComponent } from './crear-usuario-dialog.component';
 
 /**

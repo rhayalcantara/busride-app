@@ -6,8 +6,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { Asociacion, AsociacionesApi, Usuario, UsuariosApi } from '../../../../core/api';
-import { extraerMensajeError } from '../../mensaje-error.util';
 import { etiquetaUsuario, usuariosActivosConRol } from '../../usuarios-por-rol.util';
+import { extraerMensajeError } from '../../../../shared';
 
 export interface DatosVincularAdminDialog {
   asociacion: Asociacion;

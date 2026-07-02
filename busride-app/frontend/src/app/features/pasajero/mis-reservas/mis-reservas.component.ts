@@ -9,15 +9,11 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { EstadoReserva, Reserva, ReservasApi } from '../../../core/api';
-import { EstadoVacioComponent, FechaCortaPipe } from '../../../shared';
-import { extraerMensajeError } from '../../auth/mensaje-error.util';
+import { EstadoVacioComponent, extraerMensajeError, FechaCortaPipe } from '../../../shared';
 import {
   CalificarConductorDialogComponent,
   DatosCalificarDialog,
 } from './calificar-conductor-dialog.component';
-
-/** Días tras el abordaje en los que se ofrece calificar al conductor. */
-const DIAS_CALIFICABLE = 7;
 
 const ETIQUETA_ESTADO: Record<EstadoReserva, string> = {
   PROVISIONAL: 'Provisional',
@@ -30,9 +26,9 @@ const ETIQUETA_ESTADO: Record<EstadoReserva, string> = {
 /**
  * Mis reservas: historial del pasajero (GET /reservas/mias, ordenado por
  * fecha desc en el backend) con chip de estado. Desde una reserva ABORDADA
- * reciente abre el diálogo de calificar conductor; desde una reserva activa
- * con viaje EN_CURSO permite seguir el bus en vivo. 404 (sin perfil de
- * pasajero) → estado vacío claro.
+ * aún sin calificar (flag `calificada` del backend, F-09a) abre el diálogo de
+ * calificar conductor; desde una reserva activa con viaje EN_CURSO permite
+ * seguir el bus en vivo. 404 (sin perfil de pasajero) → estado vacío claro.
  */
 @Component({
   selector: 'app-pasajero-mis-reservas',
@@ -234,13 +230,12 @@ export class MisReservasComponent {
     );
   }
 
-  /** ABORDADA reciente (≤ 7 días) con conductor conocido y aún sin calificar. */
+  /** ABORDADA con conductor conocido y aún sin calificar (flag del backend). */
   protected puedeCalificar(reserva: Reserva): boolean {
-    if (reserva.estado !== 'ABORDADA' || !reserva.viaje?.conductorId) return false;
-    if (this.viajesCalificados().has(reserva.viajeId)) return false;
-    if (!reserva.fechaAbordaje) return false;
-    const transcurrido = Date.now() - new Date(reserva.fechaAbordaje).getTime();
-    return transcurrido <= DIAS_CALIFICABLE * 24 * 60 * 60 * 1000;
+    if (reserva.estado !== 'ABORDADA' || reserva.calificada) return false;
+    if (!reserva.viaje?.conductorId) return false;
+    // Calificadas en esta sesión: se ocultan sin esperar al refetch.
+    return !this.viajesCalificados().has(reserva.viajeId);
   }
 
   verEnVivo(reserva: Reserva): void {

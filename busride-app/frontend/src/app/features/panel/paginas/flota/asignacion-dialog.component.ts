@@ -14,7 +14,7 @@ import {
   FlotaApi,
   Ruta,
 } from '../../../../core/api';
-import { extraerMensajeError } from '../../mensaje-error.util';
+import { extraerMensajeError } from '../../../../shared';
 
 export interface DatosAsignacionDialog {
   buses: Bus[];

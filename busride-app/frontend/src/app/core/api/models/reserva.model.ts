@@ -57,4 +57,6 @@ export interface Reserva {
   numeroAsiento: number | null;
   fechaCreacion: string;
   fechaAbordaje: string | null;
+  /** true solo en reservas ABORDADAS cuyo abordaje ya fue calificado (F-09a). */
+  calificada: boolean;
 }

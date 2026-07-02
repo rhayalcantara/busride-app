@@ -16,8 +16,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { BrowserQRCodeReader, IScannerControls } from '@zxing/browser';
 import { AbordajeConfirmado, ReservasApi } from '../../../core/api';
-import { MonedaDopPipe } from '../../../shared';
-import { extraerMensajeError } from '../../auth/mensaje-error.util';
+import { extraerMensajeError, MonedaDopPipe } from '../../../shared';
 
 /**
  * Abordaje de pasajeros: escáner QR con la cámara trasera (@zxing/browser)

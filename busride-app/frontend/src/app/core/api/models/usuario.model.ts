@@ -41,6 +41,7 @@ export interface CambiarEstadoDto {
 export interface ListarUsuariosParams {
   pagina?: number; // desde 1 (default 1)
   limite?: number; // 1-100 (default 20)
+  rol?: 'admin' | 'asociacion' | 'conductor' | 'pasajero'; // filtro por rol (F-09a)
 }
 
 // Respuesta de GET /usuarios (listado paginado, solo admin)

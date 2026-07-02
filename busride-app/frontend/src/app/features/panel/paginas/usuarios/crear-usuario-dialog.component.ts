@@ -7,7 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { AuthApi, UsuarioCreadoRespuesta } from '../../../../core/api';
-import { extraerMensajeError } from '../../mensaje-error.util';
+import { extraerMensajeError } from '../../../../shared';
 
 /** Roles de la tabla `roles` del backend (1=admin, 2=asociacion, 3=conductor, 4=pasajero). */
 const ROLES_DISPONIBLES = [

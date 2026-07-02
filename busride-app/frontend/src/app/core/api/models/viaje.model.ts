@@ -32,6 +32,19 @@ export interface ActualizarPosicionDto {
   lng: number;
 }
 
+// Respuesta de GET /viajes/:id (F-09a, camelCase): detalle para cualquier
+// usuario autenticado — el pasajero pinta estado/última posición antes del
+// primer evento de socket.
+export interface ViajeDetalle {
+  id: string;
+  estado: EstadoViaje;
+  ruta: { id: string; nombre: string | null };
+  asientosDisponibles: number;
+  posicion: { lat: number; lng: number; timestamp: string | null } | null;
+  fechaInicio: string | null;
+  fechaFin: string | null;
+}
+
 // Respuesta de PATCH /viajes/:id/posicion
 export interface PosicionActualizada {
   viajeId: string;

@@ -7,7 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { CalificacionRegistrada, ConductoresApi } from '../../../core/api';
-import { extraerMensajeError } from '../../auth/mensaje-error.util';
+import { extraerMensajeError } from '../../../shared';
 
 /** Contexto del abordaje a calificar. */
 export interface DatosCalificarDialog {

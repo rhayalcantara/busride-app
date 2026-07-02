@@ -10,11 +10,11 @@ import { Paquete, Saldo, Transaccion, WalletApi } from '../../../core/api';
 import {
   ConfirmDialogComponent,
   EstadoVacioComponent,
+  extraerMensajeError,
   FechaCortaPipe,
-  MonedaDopPipe,
   generarReferenciaExterna,
+  MonedaDopPipe,
 } from '../../../shared';
-import { extraerMensajeError } from '../../auth/mensaje-error.util';
 
 const ICONO_POR_TIPO: Record<Transaccion['tipo'], string> = {
   RECARGA: 'add_card',

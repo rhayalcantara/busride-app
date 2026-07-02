@@ -15,11 +15,13 @@ export const routes: Routes = [
   {
     path: 'login',
     loadComponent: () => import('./features/auth/login/login.component').then((m) => m.LoginComponent),
+    title: 'BusRide — Iniciar sesión',
   },
   {
     path: 'registro',
     loadComponent: () =>
       import('./features/auth/registro/registro.component').then((m) => m.RegistroComponent),
+    title: 'BusRide — Crear cuenta',
   },
   {
     path: 'pasajero',
@@ -51,5 +53,6 @@ export const routes: Routes = [
       import('./features/auth/no-encontrada/no-encontrada.component').then(
         (m) => m.NoEncontradaComponent,
       ),
+    title: 'BusRide — Página no encontrada',
   },
 ];

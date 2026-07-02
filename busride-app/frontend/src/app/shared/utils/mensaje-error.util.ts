@@ -2,10 +2,16 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 /**
  * Extrae un mensaje legible de un error HTTP del backend NestJS.
- * El backend responde `{ message: string | string[] }` (ValidationPipe
- * devuelve arreglo de mensajes; las excepciones de negocio, un string).
+ * Origen único (F-09): antes existían copias en features/auth y features/panel.
+ *
+ * El backend responde `{ message: string | string[] }` (el ValidationPipe
+ * devuelve arreglo de mensajes; las excepciones de negocio — incluidos los
+ * 409 de flota —, un string).
  */
-export function extraerMensajeError(error: unknown, porDefecto = 'Ocurrió un error inesperado'): string {
+export function extraerMensajeError(
+  error: unknown,
+  porDefecto = 'Ocurrió un error inesperado',
+): string {
   if (error instanceof HttpErrorResponse) {
     if (error.status === 0) {
       return 'No se pudo conectar con el servidor';

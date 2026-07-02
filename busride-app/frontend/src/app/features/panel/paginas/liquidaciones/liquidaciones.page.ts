@@ -1,37 +1,41 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { LiquidacionPagadaRespuesta, LiquidacionesApi } from '../../../../core/api';
-import { EstadoVacioComponent } from '../../../../shared';
-import { extraerMensajeError } from '../../mensaje-error.util';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { EstadoLiquidacion, LiquidacionAdmin, LiquidacionesApi } from '../../../../core/api';
+import {
+  CeldaTablaDirective,
+  ColumnaTabla,
+  EstadoVacioComponent,
+  FechaCortaPipe,
+  MonedaDopPipe,
+  TablaPaginadaComponent,
+  extraerMensajeError,
+} from '../../../../shared';
+import { PagarLiquidacionDialogComponent } from './pagar-liquidacion-dialog.component';
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+type FiltroEstado = EstadoLiquidacion | 'TODAS';
+
+const monedaDop = new MonedaDopPipe();
+const fechaCorta = new FechaCortaPipe();
 
 /**
- * Liquidaciones (solo admin).
- *
- * LIMITACIÓN CONOCIDA del backend (notas Ola F2): NO existe un listado admin
- * de liquidaciones — solo `GET /liquidaciones/mias` y `/mias/resumen` (del
- * conductor autenticado) y `PATCH /liquidaciones/:id/pagar` (admin). Por eso
- * esta página no puede mostrar las pendientes: explica la limitación y ofrece
- * el flujo "marcar pagada por ID" con referencia de pago. F-09 debería añadir
- * `GET /liquidaciones` (admin) al backend.
+ * Liquidaciones (solo admin): listado completo con filtro por estado
+ * (`GET /liquidaciones?estado=`, F-09a) y acción «marcar pagada» con
+ * referencia sobre las PENDIENTES.
  */
 @Component({
   selector: 'app-liquidaciones-page',
   imports: [
-    ReactiveFormsModule,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
     MatButtonModule,
+    MatButtonToggleModule,
     MatIconModule,
-    MatProgressSpinnerModule,
+    MatProgressBarModule,
+    TablaPaginadaComponent,
+    CeldaTablaDirective,
     EstadoVacioComponent,
   ],
   template: `
@@ -39,104 +43,104 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
       <h2>Liquidaciones</h2>
     </header>
 
-    <app-estado-vacio
-      icono="receipt_long"
-      mensaje="El backend aún no expone un listado de liquidaciones para administradores (solo el historial propio de cada conductor). Hasta que exista GET /liquidaciones (previsto para la tarea F-09), no es posible mostrar aquí las pendientes: obtén el ID de la liquidación desde la base de datos o desde el conductor y márcala como pagada abajo."
-    />
+    <mat-button-toggle-group
+      class="filtro-estado"
+      aria-label="Filtrar por estado"
+      [value]="estado()"
+      (change)="cambiarEstado($event.value)"
+      hideSingleSelectionIndicator
+    >
+      <mat-button-toggle value="TODAS">Todas</mat-button-toggle>
+      <mat-button-toggle value="PENDIENTE">Pendientes</mat-button-toggle>
+      <mat-button-toggle value="EN_PROCESO">En proceso</mat-button-toggle>
+      <mat-button-toggle value="PAGADA">Pagadas</mat-button-toggle>
+    </mat-button-toggle-group>
 
-    <mat-card appearance="outlined" class="card-pagar">
-      <mat-card-header>
-        <mat-card-title>Marcar liquidación como pagada</mat-card-title>
-        <mat-card-subtitle>
-          PATCH /liquidaciones/:id/pagar — requiere el ID y una referencia de pago
-        </mat-card-subtitle>
-      </mat-card-header>
-      <mat-card-content>
-        <form [formGroup]="formulario" (ngSubmit)="marcarPagada()" novalidate>
-          <mat-form-field appearance="outline" class="campo-completo">
-            <mat-label>ID de la liquidación (UUID)</mat-label>
-            <input
-              matInput
-              formControlName="liquidacionId"
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            />
-            @if (formulario.controls.liquidacionId.hasError('required')) {
-              <mat-error>El ID es obligatorio</mat-error>
-            } @else if (formulario.controls.liquidacionId.hasError('pattern')) {
-              <mat-error>Debe ser un UUID válido</mat-error>
-            }
-          </mat-form-field>
+    @if (cargando()) {
+      <mat-progress-bar mode="indeterminate" />
+    }
 
-          <mat-form-field appearance="outline" class="campo-completo">
-            <mat-label>Referencia de pago</mat-label>
-            <input
-              matInput
-              formControlName="referenciaPago"
-              maxlength="100"
-              placeholder="TRANSF-2026-0001"
-            />
-            @if (formulario.controls.referenciaPago.hasError('required')) {
-              <mat-error>La referencia es obligatoria</mat-error>
-            }
-          </mat-form-field>
+    @if (errorCarga(); as mensaje) {
+      <app-estado-vacio
+        icono="error_outline"
+        [mensaje]="mensaje"
+        textoAccion="Reintentar"
+        (accion)="cargar()"
+      />
+    } @else if (lista().length === 0 && !cargando()) {
+      <app-estado-vacio
+        icono="receipt_long"
+        [mensaje]="
+          estado() === 'TODAS'
+            ? 'Aún no hay liquidaciones registradas.'
+            : 'No hay liquidaciones en estado ' + estado() + '.'
+        "
+      />
+    } @else {
+      <app-tabla-paginada [columnas]="columnas" [datos]="lista()">
+        <ng-template appCeldaTabla="estado" let-fila>
+          <span
+            class="chip"
+            [class.chip--ok]="fila.estado === 'PAGADA'"
+            [class.chip--pendiente]="fila.estado === 'PENDIENTE'"
+            [class.chip--proceso]="fila.estado === 'EN_PROCESO'"
+          >
+            {{ fila.estado }}
+          </span>
+        </ng-template>
 
-          @if (errorBackend(); as mensaje) {
-            <p class="mensaje mensaje--error" role="alert">{{ mensaje }}</p>
+        <ng-template appCeldaTabla="acciones" let-fila>
+          @if (fila.estado === 'PENDIENTE') {
+            <button
+              mat-icon-button
+              type="button"
+              title="Marcar pagada"
+              aria-label="Marcar liquidación como pagada"
+              (click)="marcarPagada(fila)"
+            >
+              <mat-icon>price_check</mat-icon>
+            </button>
+          } @else if (fila.referencia_pago) {
+            <span class="referencia" [title]="'Referencia: ' + fila.referencia_pago">
+              {{ fila.referencia_pago }}
+            </span>
           }
-          @if (resultado(); as exito) {
-            <p class="mensaje mensaje--ok" role="status">
-              <mat-icon class="mensaje__icono">check_circle</mat-icon>
-              {{ exito.mensaje }} (liquidación {{ exito.liquidacionId }}, estado
-              {{ exito.estado }}, referencia {{ exito.referenciaPago }})
-            </p>
-          }
-
-          <button mat-flat-button type="submit" [disabled]="cargando()">
-            @if (cargando()) {
-              <mat-spinner diameter="20" />
-            } @else {
-              Marcar pagada
-            }
-          </button>
-        </form>
-      </mat-card-content>
-    </mat-card>
+        </ng-template>
+      </app-tabla-paginada>
+    }
   `,
   styles: [
     `
       .pagina-encabezado {
-        margin-bottom: 12px;
+        margin-bottom: 8px;
       }
       .pagina-encabezado h2 {
         margin: 0;
       }
-      .card-pagar {
-        max-width: 560px;
-        margin: 16px auto 0;
+      .filtro-estado {
+        margin-bottom: 12px;
       }
-      .card-pagar form {
-        display: flex;
-        flex-direction: column;
-        margin-top: 12px;
+      .chip {
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        white-space: nowrap;
       }
-      .campo-completo {
-        width: 100%;
-      }
-      .mensaje {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 14px;
-        margin: 0 0 12px;
-      }
-      .mensaje--error {
-        color: var(--mat-sys-error, #b3261e);
-      }
-      .mensaje--ok {
+      .chip--ok {
+        background: #e6f4ea;
         color: #1e7d32;
       }
-      .mensaje__icono {
-        flex-shrink: 0;
+      .chip--pendiente {
+        background: #fff4e5;
+        color: #9a6700;
+      }
+      .chip--proceso {
+        background: #e3f2fd;
+        color: #1565c0;
+      }
+      .referencia {
+        font-size: 12px;
+        color: var(--mat-sys-on-surface-variant, rgba(0, 0, 0, 0.6));
       }
     `,
   ],
@@ -144,38 +148,81 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 })
 export class LiquidacionesPageComponent {
   private readonly liquidacionesApi = inject(LiquidacionesApi);
+  private readonly dialog = inject(MatDialog);
+  private readonly snackBar = inject(MatSnackBar);
 
+  protected readonly estado = signal<FiltroEstado>('PENDIENTE');
+  protected readonly lista = signal<LiquidacionAdmin[]>([]);
   protected readonly cargando = signal(false);
-  protected readonly errorBackend = signal<string | null>(null);
-  protected readonly resultado = signal<LiquidacionPagadaRespuesta | null>(null);
+  protected readonly errorCarga = signal<string | null>(null);
 
-  protected readonly formulario = inject(NonNullableFormBuilder).group({
-    liquidacionId: ['', [Validators.required, Validators.pattern(UUID_REGEX)]],
-    referenciaPago: ['', Validators.required],
-  });
+  protected readonly columnas: ColumnaTabla<LiquidacionAdmin>[] = [
+    { clave: 'conductor_nombre', encabezado: 'Conductor' },
+    { clave: 'ruta_nombre', encabezado: 'Ruta', valor: (l) => l.ruta_nombre ?? '—' },
+    {
+      clave: 'fecha_creacion',
+      encabezado: 'Generada',
+      valor: (l) => fechaCorta.transform(l.fecha_creacion),
+    },
+    { clave: 'total_abordajes', encabezado: 'Abordajes' },
+    {
+      clave: 'ingreso_bruto',
+      encabezado: 'Bruto',
+      valor: (l) => monedaDop.transform(l.ingreso_bruto),
+    },
+    {
+      clave: 'monto_neto',
+      encabezado: 'Neto conductor',
+      valor: (l) => monedaDop.transform(l.monto_neto),
+    },
+    { clave: 'estado', encabezado: 'Estado' },
+    { clave: 'acciones', encabezado: 'Acciones' },
+  ];
 
-  marcarPagada(): void {
-    if (this.formulario.invalid || this.cargando()) {
-      this.formulario.markAllAsTouched();
-      return;
-    }
+  constructor() {
+    this.cargar();
+  }
+
+  cambiarEstado(estado: FiltroEstado): void {
+    this.estado.set(estado);
+    this.cargar();
+  }
+
+  cargar(): void {
     this.cargando.set(true);
-    this.errorBackend.set(null);
-    this.resultado.set(null);
-
-    const { liquidacionId, referenciaPago } = this.formulario.getRawValue();
-    this.liquidacionesApi.marcarPagada(liquidacionId.trim(), referenciaPago.trim()).subscribe({
-      next: (respuesta) => {
+    this.errorCarga.set(null);
+    const estado = this.estado();
+    this.liquidacionesApi.listarTodas(estado === 'TODAS' ? undefined : estado).subscribe({
+      next: (lista) => {
+        this.lista.set(lista);
         this.cargando.set(false);
-        this.resultado.set(respuesta);
-        this.formulario.reset();
       },
       error: (error: unknown) => {
         this.cargando.set(false);
-        this.errorBackend.set(
-          extraerMensajeError(error, 'No se pudo marcar la liquidación como pagada'),
+        this.errorCarga.set(
+          extraerMensajeError(error, 'No se pudieron cargar las liquidaciones'),
         );
       },
     });
+  }
+
+  marcarPagada(liquidacion: LiquidacionAdmin): void {
+    this.dialog
+      .open(PagarLiquidacionDialogComponent, {
+        data: { liquidacion },
+        width: '440px',
+        autoFocus: false,
+      })
+      .afterClosed()
+      .subscribe((respuesta) => {
+        if (respuesta) {
+          this.snackBar.open(
+            `${respuesta.mensaje} (referencia ${respuesta.referenciaPago})`,
+            'OK',
+            { duration: 5000 },
+          );
+          this.cargar();
+        }
+      });
   }
 }

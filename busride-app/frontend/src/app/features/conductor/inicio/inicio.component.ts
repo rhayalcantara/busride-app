@@ -6,8 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { forkJoin } from 'rxjs';
 import { AsignacionBusRuta, FlotaApi, Viaje, ViajesApi } from '../../../core/api';
-import { EstadoVacioComponent, FechaCortaPipe } from '../../../shared';
-import { extraerMensajeError } from '../../auth/mensaje-error.util';
+import { EstadoVacioComponent, extraerMensajeError, FechaCortaPipe } from '../../../shared';
 
 /**
  * Home del conductor: si hay un viaje EN_CURSO ofrece ir directo a la pantalla

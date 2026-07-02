@@ -37,6 +37,7 @@ export class UsuariosApi {
     let httpParams = new HttpParams();
     if (params.pagina !== undefined) httpParams = httpParams.set('pagina', params.pagina);
     if (params.limite !== undefined) httpParams = httpParams.set('limite', params.limite);
+    if (params.rol !== undefined) httpParams = httpParams.set('rol', params.rol);
     return this.http.get<PaginaUsuarios>(this.baseUrl, { params: httpParams });
   }
 

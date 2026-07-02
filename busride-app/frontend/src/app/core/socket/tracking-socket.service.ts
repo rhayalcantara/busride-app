@@ -11,10 +11,10 @@ export interface PosicionBus {
   timestamp: string;
 }
 
-/** Payload del evento global `disponibilidad_actualizada`. */
+/** Payload del evento global `disponibilidad_actualizada` (emitido tras cada abordaje). */
 export interface DisponibilidadActualizada {
-  rutaId: string;
-  asientosLibres: number;
+  viajeId: string;
+  asientosDisponibles: number;
 }
 
 // Misma clave de localStorage que usa core/auth (TokenStorage) para el access token.

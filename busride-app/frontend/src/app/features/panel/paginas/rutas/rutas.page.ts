@@ -8,11 +8,11 @@ import {
   CeldaTablaDirective,
   ColumnaTabla,
   EstadoVacioComponent,
+  extraerMensajeError,
   MonedaDopPipe,
   TablaPaginadaComponent,
 } from '../../../../shared';
 import { AsociacionContextoService } from '../../asociacion-contexto.service';
-import { extraerMensajeError } from '../../mensaje-error.util';
 import { SelectorAsociacionComponent } from '../../selector-asociacion.component';
 
 /**

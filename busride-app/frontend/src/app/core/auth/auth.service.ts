@@ -177,7 +177,7 @@ export class AuthService {
   private usuarioDesdePayload(payload: PayloadJwt): UsuarioSesion {
     // El JWT del backend solo trae { sub, email, rol }: nombre y apellido se
     // conservan si ya estaban en memoria (login previo) o quedan vacíos hasta
-    // que una feature los rehidrate vía GET /usuarios/perfil.
+    // que una feature los rehidrate vía GET /usuarios/me.
     const actual = this.usuarioSignal();
     const mismoUsuario = actual !== null && actual.id === payload.sub;
     return {
