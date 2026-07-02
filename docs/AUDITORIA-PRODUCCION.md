@@ -93,7 +93,7 @@
 
 1. ✅ Validar e2e y commitear la ola pendiente del frontend (esta sesión).
 2. ✅ Rotar y externalizar secretos + validación de entorno al boot (esta sesión — ver §6).
-3. Empaquetado de producción: Dockerfile multi-stage backend, Dockerfile+nginx frontend (proxy `/api/v1` + `/socket.io` con upgrade WS, TLS), `docker-compose.prod.yml` (`NODE_ENV=production`, sin puertos DB/Redis publicados, restart policies, healthchecks).
+3. ✅ Empaquetado de producción: Dockerfile multi-stage backend, Dockerfile+nginx frontend, `docker-compose.prod.yml` (esta sesión — ver §6 y `docs/DESPLIEGUE.md`). TLS queda documentado (terminación en proxy del host o extender nginx).
 4. Usuario de BD no-`sa` con permisos mínimos; forzar cambio de password del admin seed.
 5. Endurecimiento runtime: helmet, CORS estricto (fallar si falta `CORS_ORIGIN` en prod), Swagger gateado, logging estructurado + filtro global de excepciones.
 6. Migración baseline de TypeORM + documentar evolución de esquema/SPs.
@@ -114,3 +114,11 @@
   - **Validación fail-fast al boot** (`backend/src/config/env.validation.ts`, cableada en `ConfigModule.forRoot({ validate })`): exige `DB_PASSWORD`, `JWT_SECRET` ≥ 32 chars (y rechaza secretos de desarrollo conocidos en producción), `CORS_ORIGIN` concreto (≠ `*`) en producción y variables numéricas válidas. 7 tests unitarios nuevos (141/141 verdes).
   - Verificado: build + lint limpios, compose OK con `.env` y error explícito sin él, backend reiniciado con secretos nuevos y login del seed admin funcional.
   - _Pendiente relacionado (pasos 3-4): usuario de BD no-`sa`, password del admin seed, TLS._
+- **2026-07-01 — Paso 3 (empaquetado de producción) ejecutado**:
+  - `backend/Dockerfile` multi-stage: target `development` (lo usa el compose de dev) y target `production` (npm ci --omit=dev, `USER node`, `NODE_ENV=production`, `node dist/main.js` directo, HEALTHCHECK). Nuevo endpoint público `GET /api/v1/salud` (`app.controller.ts`) para healthchecks/LB.
+  - `frontend/Dockerfile` (build node 24 + runtime nginx:1.27-alpine) y `frontend/nginx.conf`: SPA fallback, proxy mismo-origen `/api/` y `/socket.io/` (upgrade WS) → backend, gzip, cache inmutable de estáticos hasheados.
+  - `docker-compose.prod.yml`: NODE_ENV=production, SQL Server sin puerto publicado, restart policies + healthchecks en todo, sin Redis (sin uso), secretos `${VAR:?}`, `CORS_ORIGIN` obligatorio, sin `container_name` fijos (permite stacks paralelos con `-p`).
+  - `.dockerignore` en backend y frontend; compose de dev fijado a `target: development`.
+  - Guía de despliegue nueva: `docs/DESPLIEGUE.md` (secretos, arranque, TLS, operación, dev vs prod).
+  - Hallazgos corregidos durante el smoke test: build del frontend requiere node 24 (npm 10 rechaza peerDeps anidados del lock, @zxing exige node ≥ 24); entry del backend en imagen es `dist/main.js` (sin `test/` en contexto, tsc usa rootDir=src); healthcheck nginx con `127.0.0.1` (localhost → ::1 y nginx escucha IPv4).
+  - **Smoke test PASADO** en stack aislado (`-p busride_prod`, :8080): SPA servida, fallback de rutas Angular, login del seed vía nginx, `/salud`, handshake Socket.IO, y los 3 servicios `healthy`. Stack de prueba destruido tras la verificación. 141/141 tests unitarios verdes.

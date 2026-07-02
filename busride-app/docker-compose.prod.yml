@@ -1,0 +1,105 @@
+# ============================================================
+# Stack de PRODUCCIÓN de BusRide.
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Secretos: se interpolan desde ./.env (ver .env.example). Requiere además
+# CORS_ORIGIN (la validación de entorno del backend lo exige en producción).
+#
+# Diferencias vs docker-compose.yml (desarrollo):
+#   - backend compilado (target production, no-root, node dist directo)
+#   - frontend servido por nginx (proxy mismo-origen /api y /socket.io)
+#   - SQL Server SIN puerto publicado al host (solo red interna)
+#   - restart policies y healthchecks en todos los servicios
+#   - sin Redis: el código no lo usa hoy (ver auditoría §4/§8)
+#
+# TLS: terminar en el proxy/balanceador del host apuntando a frontend:80,
+# o extender frontend/nginx.conf con listen 443 ssl y certificados montados.
+# Sin container_name fijos: permite -p <proyecto> para stacks paralelos.
+# ============================================================
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    environment:
+      SA_PASSWORD: ${SA_PASSWORD:?Define SA_PASSWORD en .env (ver .env.example)}
+      ACCEPT_EULA: "Y"
+      # Cambiar según licenciamiento (Express/Standard/Enterprise)
+      MSSQL_PID: ${MSSQL_PID:-Express}
+    # Sin ports: solo accesible por la red interna del stack
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - busride_net
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # One-shot idempotente: crea BD + schema + SPs + admin seed (igual que en dev)
+  sqlserver-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      DB_HOST: sqlserver
+      SA_PASSWORD: ${SA_PASSWORD:?Define SA_PASSWORD en .env (ver .env.example)}
+    volumes:
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+      - ./database/init.sh:/usr/local/bin/busride-init.sh:ro
+    entrypoint: ["/bin/bash", "/usr/local/bin/busride-init.sh"]
+    restart: "no"
+    networks:
+      - busride_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DB_HOST: sqlserver
+      DB_PORT: 1433
+      DB_NAME: busride_db
+      DB_USER: sa
+      DB_PASSWORD: ${SA_PASSWORD:?Define SA_PASSWORD en .env (ver .env.example)}
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en .env (ver .env.example)}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      # Origen del frontend (p. ej. https://app.busride.do). Con el proxy
+      # mismo-origen el navegador no cruza orígenes, pero la validación de
+      # entorno lo exige explícito para no dejar CORS abierto por accidente.
+      CORS_ORIGIN: ${CORS_ORIGIN:?Define CORS_ORIGIN en .env (origen público del frontend)}
+      PORT: 3000
+    # Sin ports: nginx (frontend) lo alcanza por la red interna
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      sqlserver-init:
+        condition: service_completed_successfully
+    networks:
+      - busride_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+    networks:
+      - busride_net
+
+volumes:
+  sqlserver_data:
+
+networks:
+  busride_net:
+    driver: bridge

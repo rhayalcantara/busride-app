@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { AppController } from './app.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -89,6 +90,8 @@ import { LiquidacionModule }  from './modules/liquidaciones/liquidacion.module';
     WalletModule,
     LiquidacionModule,
   ],
+  // GET /api/v1/salud — healthcheck público (Docker HEALTHCHECK / load balancers)
+  controllers: [AppController],
   providers: [
     // Cadena de guards globales (T-12, ampliada en T-16/B3). El ORDEN de estos
     // providers determina el orden de ejecución:

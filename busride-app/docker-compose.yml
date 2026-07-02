@@ -59,6 +59,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      # El Dockerfile es multi-stage; este compose de desarrollo usa el target
+      # development (start:dev + bind mount). Producción: docker-compose.prod.yml
+      target: development
     container_name: busride_backend
     environment:
       NODE_ENV: development
