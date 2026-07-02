@@ -17,3 +17,9 @@ test-results/
 
 # Logs
 *.log
+
+# Videos demo (docs/demos): temporales de grabación; los .mp4 e img/ sí van
+docs/demos/raw/
+docs/demos/aud/
+docs/demos/_auth_rec.json
+__pycache__/

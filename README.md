@@ -10,6 +10,8 @@ Plataforma de rutas y abordaje de autobuses (República Dominicana): pasajeros b
 
 El proyecto vive en `busride-app/`: `backend/` (API), `database/init/` (schema + SPs + seeds), `docker-compose.yml`.
 
+> 🎬 **¿Cómo se ve funcionando?** Videos demo narrados y guía visual con capturas reales de los 3 roles (pasajero, conductor, admin): [`docs/DEMO.md`](docs/DEMO.md).
+
 ## Arranque con Docker
 
 ```bash
